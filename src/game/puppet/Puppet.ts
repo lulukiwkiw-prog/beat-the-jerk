@@ -224,6 +224,10 @@ export class Puppet {
   get invulnerable() {
     return this.scatter !== null;
   }
+  get squashScaleY() {
+    return this.sy.v;
+  }
+
   get isDown() {
     return this.downT > 0;
   }

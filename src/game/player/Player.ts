@@ -6,6 +6,10 @@ import { buildShoe } from '../projectiles/shoeModel';
 import type { Group } from 'three';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const smooth = (t: number) => {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+};
 
 /** 玩家角色的狀態與動作。 */
 export class Player {
@@ -108,13 +112,36 @@ export class Player {
     }
   }
 
-  /** 依目前狀態擺姿勢（每個渲染畫格呼叫）。 */
-  pose(frameDt: number) {
+  /**
+   * 依目前狀態擺姿勢（每個渲染畫格呼叫）。target＝對手的位置與臉的高度，
+   * 甩巴掌時用來讓手真的甩到臉上。
+   */
+  pose(frameDt: number, target: { x: number; faceY: number; faceFront: number }) {
     const L = this.rig;
     const a = this.attack;
     L.root.position.set(this.x, this.hop, 0);
-    const face = this.facing > 0 ? 0.85 : -0.85;
-    this.bodyYaw += (face - this.bodyYaw) * Math.min(1, frameDt * 14);
+    let face = this.facing > 0 ? 0.85 : -0.85;
+    let yawRate = 14;
+    let slap: { arm: 'L' | 'R'; shX: number } | null = null;
+    if (a && a.move.id === 'slap') {
+      const S = PLAYER.slapAnim;
+      const t = a.t;
+      const w = a.move.windup;
+      // 往前踏一步補足距離：手臂長度扣掉高度差後，剩下的水平距離靠踏步
+      const dy = target.faceY - (S.shoulderY + this.hop);
+      const reachX = Math.sqrt(Math.max(0, S.armLength * S.armLength - dy * dy));
+      const gap = Math.abs(target.x - this.x) - target.faceFront;
+      const lunge = Math.min(S.maxLunge, Math.max(0, gap - reachX));
+      const inOut = t < S.lungeIn ? smooth(t / S.lungeIn) : t < S.hold ? 1 : 1 - smooth((t - S.hold) / Math.max(0.01, a.move.duration - S.hold));
+      L.root.position.x += this.facing * lunge * inOut;
+      // 身體轉正面對對手，扭腰把手掌從旁邊甩過臉（判定時間點剛好掃過臉）
+      const twist = t < w ? lerp(-S.twistBack, 0, t / w) : t < S.hold ? lerp(0, S.twistThrough, (t - w) / (S.hold - w)) : lerp(S.twistThrough, 0, smooth((t - S.hold) / Math.max(0.01, a.move.duration - S.hold)));
+      face = this.facing * (Math.PI / 2 + twist);
+      yawRate = 40;
+      const elev = Math.atan2(dy, Math.max(0.2, reachX));
+      slap = { arm: this.facing > 0 ? 'L' : 'R', shX: -(Math.PI / 2 + elev) * Math.min(1, inOut * 1.5) };
+    }
+    this.bodyYaw += (face - this.bodyYaw) * Math.min(1, frameDt * yawRate);
     L.body.rotation.y = this.bodyYaw;
     L.body.rotation.z = this.stun > 0 ? 0.22 * this.facing : this.dodge > 0 ? 0.3 * this.facing : 0;
     const bob = Math.sin(this.bob * 5) * 0.06;
@@ -139,10 +166,15 @@ export class Player {
         A.shR = [lerp(-0.2, -2.9, p), 0];
         A.elR = lerp(-1.6, -0.3, p);
         L.root.position.y += Math.sin(p * Math.PI) * 0.25;
-      } else if (m.id === 'slap') {
-        const p = Math.min(1, t / 0.16);
-        A.shR = [-1.45, lerp(-1.0, 0.7, p)];
-        A.elR = 0;
+      } else if (m.id === 'slap' && slap) {
+        // 靠鏡頭那一側的手，伸直、張開手掌
+        if (slap.arm === 'L') {
+          A.shL = [slap.shX, 0];
+          A.elL = 0;
+        } else {
+          A.shR = [slap.shX, 0];
+          A.elR = 0;
+        }
         open = true;
       } else if (m.id === 'shoe') {
         const p = Math.min(1, t / 0.12);
@@ -165,7 +197,11 @@ export class Player {
     L.shR.rotation.set(A.shR[0], 0, A.shR[1]);
     L.elL.rotation.x = A.elL;
     L.elR.rotation.x = A.elR;
-    L.gloveR.scale.set(open ? 0.5 : 1, open ? 1.35 : 1.05, open ? 1.2 : 1.1);
+    const openArm = slap?.arm;
+    for (const [g, side] of [[L.gloveL, 'L'], [L.gloveR, 'R']] as const) {
+      const o = open && openArm === side;
+      g.scale.set(o ? 0.5 : 1, o ? 1.35 : 1.05, o ? 1.2 : 1.1);
+    }
     this.heldShoe.visible = !!(a && a.move.id === 'shoe' && a.t < a.move.windup);
   }
 }

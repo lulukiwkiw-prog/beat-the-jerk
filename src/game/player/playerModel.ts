@@ -21,6 +21,7 @@ export interface PlayerRig {
   shR: Group;
   elL: Group;
   elR: Group;
+  gloveL: Mesh;
   gloveR: Mesh;
 }
 
@@ -130,7 +131,7 @@ export function buildPlayer(shadows = true): PlayerRig {
     arms.push(sh);
     elbows.push(el);
   }
-  return { root, body, torso, legL: legs[0], legR: legs[1], shL: arms[0], shR: arms[1], elL: elbows[0], elR: elbows[1], gloveR: gloves[1] };
+  return { root, body, torso, legL: legs[0], legR: legs[1], shL: arms[0], shR: arms[1], elL: elbows[0], elR: elbows[1], gloveL: gloves[0], gloveR: gloves[1] };
 }
 
 /** 待機拳架（階段 1 只有待機）。 */

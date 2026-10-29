@@ -78,3 +78,6 @@ export function partFaceDims(part: PaintPartId, f: Face): [number, number] {
   }
   return faceDims(def.size, f);
 }
+
+/** 頭部中心離地高度（站直時） */
+export const headCenterY = () => SKELETON.pelvisY + SKELETON.neckJointY + SKELETON.headY;

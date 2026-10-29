@@ -98,6 +98,8 @@ export const PLAYER = {
   inputBuffer: 0.25,
   /** 格鬥站姿：前腳往前、後腳往後（弧度） */
   stance: { front: 0.3, back: 0.25 },
+  /** 甩巴掌動畫：肩高、手臂長（到掌心）、踏步上限、時間點（秒）、扭腰角度 */
+  slapAnim: { shoulderY: 2.93, armLength: 1.55, maxLunge: 2.6, lungeIn: 0.05, hold: 0.16, twistBack: 0.65, twistThrough: 0.45 },
 } as const;
 
 /** 投射物碰撞：木偶受擊框額外寬度、移除範圍 */

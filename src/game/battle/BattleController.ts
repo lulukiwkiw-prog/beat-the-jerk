@@ -16,6 +16,7 @@ import { buildPlayer } from '../player/playerModel';
 import { ShoeProjectiles } from '../projectiles/shoes';
 import type { PaintStore } from '../puppet/paintSurface';
 import { Puppet, type PuppetEvent } from '../puppet/Puppet';
+import { headCenterY, PART_DEFS } from '../puppet/parts';
 import { ScoreLedger, type ScoreLine } from '../scoring/ScoreLedger';
 import { ARENA_BACKGROUND, buildArena } from '../three/arena';
 import { computeFrame } from '../three/camera';
@@ -380,7 +381,7 @@ export class BattleController {
     this.paint.flush();
     const p = this.puppet;
     const pl = this.player;
-    pl.pose(frameDt);
+    pl.pose(frameDt, { x: p.x, faceY: p.lift + headCenterY() * p.squashScaleY, faceFront: PART_DEFS.head.size[2] / 2 });
     const f = computeFrame({
       aspect: this.host.camera.aspect,
       fov: this.host.camera.fov,
