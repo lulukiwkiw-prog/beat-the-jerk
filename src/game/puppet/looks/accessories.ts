@@ -83,7 +83,11 @@ function teruFaceMaterial() {
   const cv = document.createElement('canvas');
   cv.width = 512;
   cv.height = 256;
-  const c = cv.getContext('2d')!;
+  const c = cv.getContext('2d');
+  if (!c) {
+    teruMat = new MeshStandardMaterial({ color: srgb('#FFFFFF'), roughness: 0.45, metalness: 0 });
+    return teruMat;
+  }
   c.fillStyle = '#FFFFFF';
   c.fillRect(0, 0, 512, 256);
   const cx = 128;
