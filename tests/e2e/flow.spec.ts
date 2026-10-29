@@ -43,33 +43,11 @@ test('填表 → 3D 彩繪（正面、側面、背面）→ 擂台預覽受擊�
   await page.getByTestId('go-duel').click();
   await expect(page.getByTestId('paint-bubble')).toHaveText('這點小事都做不好？');
 
-  // 擂台預覽：同一份彩繪
-  await expect(page.getByTestId('arena-stage').locator('canvas')).toBeVisible({ timeout: 20_000 });
+  // 開戰準備 → 決鬥：同一份彩繪
+  await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
   expect(await b.painted('head', 4)).toBeGreaterThan(200);
-
-  await page.getByTestId('act-punch').click();
-  await page.getByTestId('act-slap').click();
-  await expect.poll(async () => (await b.arena()).decals).toBeGreaterThan(0);
-  await page.getByTestId('act-explode').click();
-  await expect.poll(async () => (await b.arena()).scattered).toBe(true);
-  // 噴飛期間再打視為揮空
-  await page.getByTestId('act-punch').click();
-  await expect.poll(async () => (await b.arena()).scattered, { timeout: 30_000 }).toBe(false);
-
-  // 打上天：重摔落地觸發噴飛，最後組回
-  await page.getByTestId('act-launch').click();
-  await expect.poll(async () => (await b.arena()).scattered, { timeout: 30_000 }).toBe(true);
-  await expect.poll(async () => (await b.arena()).scattered, { timeout: 30_000 }).toBe(false);
-
-  // 撞牆回彈：木偶不會飛出場外
-  for (let i = 0; i < 3; i++) await page.getByTestId('act-smash').click();
-  await page.waitForTimeout(1500);
-  const s = await b.arena();
-  expect(s.x).toBeLessThanOrEqual(6.6);
-  expect(s.x).toBeGreaterThanOrEqual(-6.6);
-
-  // 回彩繪室，資料仍在
   await page.getByRole('button', { name: '← 回彩繪室' }).click();
+  // 回彩繪室、回通緝單，資料仍在
   await page.getByRole('button', { name: '← 回通緝單' }).click();
   await expect(page.getByTestId('field-a')).toHaveValue('明明是他沒做事，卻當眾怪我。');
   await expect(page.getByTestId('field-b-0')).toHaveValue('這點小事都做不好？');
@@ -83,22 +61,8 @@ test('沒有啟用的 B 時，完成動畫只顯示滑稽表情、不出現文�
   await page.getByTestId('go-duel').click();
   await page.waitForTimeout(500);
   await expect(page.getByTestId('paint-bubble')).toBeHidden();
-  await expect(page.getByTestId('arena-stage')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
   expect(errors).toEqual([]);
-});
-
-test('暫停（切到背景）時噴飛零件立刻歸位', async ({ page }) => {
-  await fillWanted(page);
-  await page.getByTestId('go-duel').click();
-  await expect(page.getByTestId('arena-stage').locator('canvas')).toBeVisible({ timeout: 20_000 });
-  const b = bt(page);
-  await page.getByTestId('act-explode').click();
-  await expect.poll(async () => (await b.arena()).scattered).toBe(true);
-  await page.evaluate(() => {
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  expect((await b.arena()).scattered).toBe(false);
 });
 
 test('點選部位 → 放大彩繪 → 返回全身', async ({ page }) => {
@@ -132,6 +96,7 @@ test('裝置不支援 WebGL 時顯示說明文字', async ({ page }) => {
   await expect(page.getByText('這台裝置無法顯示 3D 畫面')).toBeVisible();
   // 仍可繼續流程
   await page.getByTestId('go-duel').click();
+  await page.getByTestId('begin-battle').click();
   await expect(page.getByText('這台裝置無法顯示 3D 畫面')).toBeVisible();
 });
 

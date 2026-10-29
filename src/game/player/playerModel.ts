@@ -20,6 +20,7 @@ export interface PlayerRig {
   shR: Group;
   elL: Group;
   elR: Group;
+  gloveR: Mesh;
 }
 
 /** 玩家角色：深藍運動服、白色腰線、紅色拳套與頭帶，臉部不畫五官。 */
@@ -63,6 +64,7 @@ export function buildPlayer(shadows = true): PlayerRig {
   tail.rotation.x = 0.6;
   const arms: Group[] = [];
   const elbows: Group[] = [];
+  const gloves: Mesh[] = [];
   for (const s of [-1, 1]) {
     const sh = new Group();
     sh.position.set(s * 0.92, 1.18, 0);
@@ -77,10 +79,11 @@ export function buildPlayer(shadows = true): PlayerRig {
     glove.position.y = -0.74;
     glove.castShadow = shadows;
     el.add(glove);
+    gloves.push(glove);
     arms.push(sh);
     elbows.push(el);
   }
-  return { root, body, torso, legL: legs[0], legR: legs[1], shL: arms[0], shR: arms[1], elL: elbows[0], elR: elbows[1] };
+  return { root, body, torso, legL: legs[0], legR: legs[1], shL: arms[0], shR: arms[1], elL: elbows[0], elR: elbows[1], gloveR: gloves[1] };
 }
 
 /** 待機拳架（階段 1 只有待機）。 */

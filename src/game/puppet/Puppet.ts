@@ -25,6 +25,7 @@ export interface PuppetEnv {
 }
 
 type Act = 'gloat' | null;
+export type AiPose = 'idle' | 'windup' | 'punch';
 
 /**
  * 積木人（對手）：骨架、彩繪部位、彈簧姿勢、受擊反應、噴飛再組回。
@@ -57,6 +58,8 @@ export class Puppet {
   private actT = 0;
   private scatter: Scatter | null = null;
   private world: Object3D | null = null;
+  private aiPose: AiPose = 'idle';
+  private aiSide: -1 | 1 = -1;
 
   constructor(paint: PaintStore, opts: { shadows?: boolean } = {}) {
     const shadows = opts.shadows ?? true;
@@ -177,6 +180,7 @@ export class Puppet {
     for (const c of CH) this.pose[c] = spring0();
     this.waveT = this.downT = 0;
     this.act = null;
+    this.aiPose = 'idle';
     this.decals.clear();
     this.delayed.reset();
     this.apply();
@@ -233,6 +237,12 @@ export class Puppet {
     this.vx += dir * R.wallSmash.push;
     this.sy.vel += R.wallSmash.squashY;
     this.pose.torsoZ.vel -= dir * 6;
+  }
+
+  /** 木偶出拳的姿勢：預備（明顯可見）與出拳。side＝玩家所在方向。 */
+  setAiPose(pose: AiPose, side: -1 | 1) {
+    this.aiPose = pose;
+    this.aiSide = side;
   }
 
   gloat() {
@@ -376,6 +386,21 @@ export class Puppet {
       T.knL = -0.6;
       T.knR = -0.6;
       T.headX = 0.2;
+    }
+    if (this.aiPose !== 'idle' && !this.airborne) {
+      const k = this.aiSide < 0 ? 1 : -1;
+      const sh = this.aiSide < 0 ? 'shL' : 'shR';
+      const el = this.aiSide < 0 ? 'elL' : 'elR';
+      if (this.aiPose === 'windup') {
+        T[sh] = 0.5 * k;
+        T[el] = 1.6 * k;
+        T.torsoZ = -0.14 * k;
+        T.headZ = -0.08 * k;
+      } else {
+        T[sh] = -1.6 * k;
+        T[el] = 0;
+        T.torsoZ = 0.16 * k;
+      }
     }
     if (this.act === 'gloat') {
       const a = this.actT;

@@ -1,4 +1,4 @@
-import { DirectionalLight, HemisphereLight, type Object3D } from 'three';
+import { Color, DirectionalLight, HemisphereLight, type Object3D } from 'three';
 import { srgb } from './color';
 
 export interface Lights {
@@ -6,6 +6,8 @@ export interface Lights {
   key: DirectionalLight;
   fill: DirectionalLight;
   setShadows(on: boolean): void;
+  /** 0＝一般、1＝最暖（主光轉暖橘、環境光降低） */
+  setWarmth(k: number): void;
 }
 
 /** 半球環境光＋主平行光（柔和陰影）＋淡藍補光。 */
@@ -25,12 +27,24 @@ export function addLights(scene: Object3D, range: number): Lights {
   const fill = new DirectionalLight(srgb('#BCD0FF'), 0.8);
   fill.position.set(-6, 4, 6);
   scene.add(fill);
+  const keyCool = srgb('#FFF6E8');
+  const keyWarm = srgb('#FFB070');
+  const hemiBase = hemi.intensity;
+  const keyBase = key.intensity;
+  const tmp = new Color();
   return {
     hemi,
     key,
     fill,
     setShadows(on) {
       key.castShadow = on;
+    },
+    setWarmth(k) {
+      const t = Math.max(0, Math.min(1, k));
+      key.color.copy(tmp.copy(keyCool).lerp(keyWarm, t));
+      key.intensity = keyBase * (1 + 0.1 * t);
+      hemi.intensity = hemiBase * (1 - 0.3 * t);
+      fill.intensity = 0.8 * (1 - 0.6 * t);
     },
   };
 }

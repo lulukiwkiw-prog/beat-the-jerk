@@ -6,4 +6,5 @@ export const EFFECTS = {
   vibrateMs: 18,
   particleLife: [0.7, 1.1],
   wordLife: 0.6,
+  scoreLife: 0.9,
 } as const;

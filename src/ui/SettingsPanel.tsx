@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createStore, useStore } from '../state/store';
 import { prefersReducedMotion, updateSettings, useSettings, vibrationSupported, type Level3, type QualityMode } from '../state/settings';
 import { Segmented } from './Segmented';
 
@@ -12,9 +13,15 @@ const LEVELS: { value: Level3; label: string }[] = [
  * 設定（任何畫面皆可開啟）。只顯示目前已有作用的項目；
  * 音效、音樂、漫畫鼻血等於之後的階段加入。
  */
-export function SettingsPanel() {
+const openStore = createStore(false);
+/** 從其他地方（例如戰鬥 HUD）開啟設定 */
+export const openSettings = () => openStore.set(true);
+export const useSettingsOpen = () => useStore(openStore);
+
+export function SettingsPanel({ showGear = true }: { showGear?: boolean }) {
   const s = useSettings();
-  const [open, setOpen] = useState(false);
+  const open = useStore(openStore);
+  const setOpen = (v: boolean | ((p: boolean) => boolean)) => openStore.set(typeof v === 'function' ? v(openStore.get()) : v);
   const [about, setAbout] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -30,9 +37,11 @@ export function SettingsPanel() {
 
   return (
     <>
-      <button type="button" className="gear" aria-label="設定" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="open-settings">
-        ⚙
-      </button>
+      {showGear && (
+        <button type="button" className="gear" aria-label="設定" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="open-settings">
+          ⚙
+        </button>
+      )}
       {open && (
         <div className="settings" role="dialog" aria-label="設定" ref={panelRef} tabIndex={-1}>
           <div className="settings-head">

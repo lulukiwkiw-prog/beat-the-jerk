@@ -22,15 +22,38 @@ export async function fillWanted(page: Page, a = '明明是他沒做事，卻當
 type Bt = {
   paintRoom: { screenPointOf(part: string, face: number, a?: number, b?: number): { x: number; y: number } | null; turnBy(d: number): void; isSettled: boolean };
   paint: { paintedPixels(part: string, face?: number): number };
-  arena: { debugState(): { x: number; lift: number; scattered: boolean; particles: number; decals: number } };
+  battle: {
+    debugState(): BattleDebug;
+    debugSetPlayerX(x: number): void;
+  };
 };
+
+export interface BattleDebug {
+  phase: string;
+  paused: boolean;
+  score: number;
+  combo: number;
+  maxCombo: number;
+  timeLeft: number;
+  elapsed: number;
+  playerX: number;
+  puppetX: number;
+  puppetLift: number;
+  scattered: boolean;
+  projectiles: number;
+  particles: number;
+  decals: number;
+  aiPhase: string;
+  attacking: boolean;
+}
 
 export const bt = (page: Page) => ({
   point: (part: string, face: number, a = 0.5, b = 0.5) =>
     page.evaluate(([p, f, x, y]) => (window as unknown as { __bt: Bt }).__bt.paintRoom.screenPointOf(p as string, f as number, x as number, y as number), [part, face, a, b] as const),
   painted: (part: string, face?: number) =>
     page.evaluate(([p, f]) => (window as unknown as { __bt: Bt }).__bt.paint.paintedPixels(p as string, f as number | undefined), [part, face] as const),
-  arena: () => page.evaluate(() => (window as unknown as { __bt: Bt }).__bt.arena.debugState()),
+  battle: () => page.evaluate(() => (window as unknown as { __bt: Bt }).__bt.battle.debugState()),
+  setPlayerX: (x: number) => page.evaluate((v) => (window as unknown as { __bt: Bt }).__bt.battle.debugSetPlayerX(v), x),
 });
 
 export async function drag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
@@ -38,4 +61,23 @@ export async function drag(page: Page, from: { x: number; y: number }, to: { x: 
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 12 });
   await page.mouse.up();
+}
+
+/** 從彩繪室進入開戰準備並開打，等到倒數結束。 */
+export async function startBattle(page: Page) {
+  await page.getByTestId('go-duel').click();
+  await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
+  const skip = page.getByRole('button', { name: '略過' });
+  if (await skip.isVisible()) await skip.click();
+  await page.getByTestId('begin-battle').click();
+  await expect(page.getByTestId('battle-stage').locator('canvas')).toBeVisible();
+  await waitPhase(page, 'fight');
+}
+
+export async function waitPhase(page: Page, phase: string, timeout = 30_000) {
+  await page.waitForFunction(
+    (ph) => (window as unknown as { __bt?: { battle?: { debugState(): { phase: string } } } }).__bt?.battle?.debugState().phase === ph,
+    phase,
+    { timeout },
+  );
 }

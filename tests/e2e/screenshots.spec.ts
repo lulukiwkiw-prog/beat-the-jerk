@@ -1,17 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { bt, drag } from './helpers';
+import { bt, drag, waitPhase } from './helpers';
 
 const SIZES = [
   { name: 'mobile-portrait', width: 390, height: 844 },
   { name: 'mobile-landscape', width: 844, height: 390 },
   { name: 'desktop', width: 1440, height: 900 },
 ];
-const DIR = 'screenshots/stage-1';
+const DIR = 'screenshots/stage-2';
 
 for (const s of SIZES) {
   test(`截圖 ${s.name}`, async ({ page }) => {
     await page.setViewportSize({ width: s.width, height: s.height });
-    await page.goto('/');
+    await page.goto('/?round=40');
     await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
     await page.getByTestId('field-b-0').fill('這點小事都做不好？');
     await page.screenshot({ path: `${DIR}/${s.name}-1-wanted.png` });
@@ -19,26 +19,38 @@ for (const s of SIZES) {
     await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __bt: { paintRoom: { isSettled: boolean } } }).__bt.paintRoom.isSettled);
     const b = bt(page);
-    // 畫一點東西：頭髮、眼睛、領帶
-    await page.getByRole('button', { name: '粗', exact: true }).click();
-    await drag(page, (await b.point('head', 4, 0.1, 0.12))!, (await b.point('head', 4, 0.9, 0.12))!);
-    await page.getByRole('button', { name: '黑', exact: true }).click();
-    await page.getByRole('button', { name: '中', exact: true }).click();
-    await drag(page, (await b.point('head', 4, 0.3, 0.45))!, (await b.point('head', 4, 0.32, 0.47))!);
-    await drag(page, (await b.point('head', 4, 0.7, 0.45))!, (await b.point('head', 4, 0.72, 0.47))!);
+    await page.getByRole('button', { name: '套用臉部範例：歪嘴挑眉' }).click();
     await page.getByRole('button', { name: '紅', exact: true }).click();
     await page.getByRole('button', { name: '粗', exact: true }).click();
     await drag(page, (await b.point('torso', 4, 0.5, 0.1))!, (await b.point('torso', 4, 0.5, 0.85))!);
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${DIR}/${s.name}-2-paint.png` });
     await page.getByTestId('go-duel').click();
-    await page.waitForTimeout(900);
-    await page.screenshot({ path: `${DIR}/${s.name}-3-finish.png` });
-    await expect(page.getByTestId('arena-stage').locator('canvas')).toBeVisible({ timeout: 20_000 });
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: `${DIR}/${s.name}-4-arena.png` });
-    await page.getByTestId('act-explode').click();
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: `${DIR}/${s.name}-5-scatter.png` });
+    await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${DIR}/${s.name}-3-prep.png` });
+    const skip = page.getByRole('button', { name: '略過' });
+    if (await skip.isVisible()) await skip.click();
+    await page.getByTestId('begin-battle').click();
+    await waitPhase(page, 'fight');
+    const st = await b.battle();
+    await b.setPlayerX(st.puppetX - 2.2);
+    await page.keyboard.press('1');
+    await expect.poll(async () => (await b.battle()).score).toBeGreaterThan(0);
+    await page.screenshot({ path: `${DIR}/${s.name}-4-fight.png` });
+    await page.keyboard.press('q');
+    await expect.poll(async () => (await b.battle()).attacking).toBe(false);
+    await b.setPlayerX(-6);
+    await page.keyboard.press('1');
+    await expect.poll(async () => (await b.battle()).projectiles, { timeout: 10_000 }).toBeGreaterThan(0);
+    await page.screenshot({ path: `${DIR}/${s.name}-5-weapon.png` });
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('pause-overlay')).toBeVisible();
+    await page.screenshot({ path: `${DIR}/${s.name}-6-pause.png` });
+    await page.getByTestId('resume').click();
+    await expect.poll(async () => (await b.battle()).timeLeft, { timeout: 60_000 }).toBeLessThan(12);
+    await page.screenshot({ path: `${DIR}/${s.name}-7-winddown.png` });
+    await expect(page.getByTestId('final-score')).toBeVisible({ timeout: 60_000 });
+    await page.screenshot({ path: `${DIR}/${s.name}-8-summary.png` });
   });
 }
