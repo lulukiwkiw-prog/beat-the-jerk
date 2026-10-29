@@ -7,6 +7,7 @@ import { DecalLayer } from './decals';
 import type { PaintStore } from './paintSurface';
 import { PART_DEFS, type FixedPartId, type PaintPartId } from './parts';
 import { Scatter } from './scatter';
+import { buildAccessory, type AccessorySlot } from './looks/accessories';
 import { DelayBuffer, spring0, stepSpring, type Spring } from './spring';
 
 const R = PUPPET.reactions;
@@ -60,9 +61,13 @@ export class Puppet {
   private world: Object3D | null = null;
   private aiPose: AiPose = 'idle';
   private aiSide: -1 | 1 = -1;
+  private accObjects: Object3D[] = [];
+  private offAcc: () => void;
+  private readonly shadows: boolean;
 
   constructor(paint: PaintStore, opts: { shadows?: boolean } = {}) {
     const shadows = opts.shadows ?? true;
+    this.shadows = shadows;
     this.spinPivot.position.y = PUPPET.height / 2;
     this.root.add(this.spinPivot);
     const off = new Group();
@@ -145,6 +150,31 @@ export class Puppet {
       shoe.position.set(0, -1.07, 0.15);
       kn.add(shoe);
     }
+    this.syncAccessories(paint);
+    this.offAcc = paint.onAccessories(() => this.syncAccessories(paint));
+  }
+
+  /** 依目前選的範例重建 3D 配件（掛在部位 mesh 底下，會跟著噴飛）。 */
+  private syncAccessories(paint: PaintStore) {
+    this.accObjects.forEach((o) => o.removeFromParent());
+    this.accObjects = [];
+    for (const slot of ['face', 'hair', 'costume'] as AccessorySlot[]) {
+      const id = paint.accessories[slot];
+      if (!id) continue;
+      for (const a of buildAccessory(id)) {
+        const target = (this.meshes as Record<string, Mesh>)[a.part] ?? (this.fixed as Record<string, Mesh>)[a.part];
+        if (!target) continue;
+        a.object.traverse((o) => {
+          if ((o as Mesh).isMesh) (o as Mesh).castShadow = this.shadows;
+        });
+        target.add(a.object);
+        this.accObjects.push(a.object);
+      }
+    }
+  }
+
+  get accessoryCount() {
+    return this.accObjects.length;
   }
 
   /** 加入場景（噴飛時零件掛到這個物件下）。 */
@@ -457,6 +487,8 @@ export class Puppet {
   }
 
   dispose() {
+    this.offAcc();
+    this.accObjects.forEach((o) => o.removeFromParent());
     this.forceReassemble();
     this.decals.clear();
     this.root.removeFromParent();

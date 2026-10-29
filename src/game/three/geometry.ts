@@ -24,7 +24,14 @@ export function roundedBox(w: number, h: number, d: number, r: number, seg = SEG
   const hh = h / 2 - r;
   const hd = d / 2 - r;
   const cl = (v: number, m: number) => Math.max(-m, Math.min(m, v));
+  const uv = g.attributes.uv;
+  const size = [w, h, d];
+  // 每一面內的 u、v 對應哪一軸（BoxGeometry 面順序 +X、−X、+Y、−Y、+Z、−Z）
+  const AX: [number, number][] = [[2, 1], [2, 1], [0, 2], [0, 2], [0, 1], [0, 1]];
+  const per = pos.count / 6;
+  const p0 = new Vector3();
   for (let i = 0; i < pos.count; i++) {
+    p0.fromBufferAttribute(pos, i);
     p.set(warp(pos.getX(i), w / 2), warp(pos.getY(i), h / 2), warp(pos.getZ(i), d / 2));
     c.set(cl(p.x, hw), cl(p.y, hh), cl(p.z, hd));
     n.subVectors(p, c);
@@ -33,7 +40,16 @@ export function roundedBox(w: number, h: number, d: number, r: number, seg = SEG
     p.copy(c).addScaledVector(n, r);
     pos.setXYZ(i, p.x, p.y, p.z);
     nor.setXYZ(i, n.x, n.y, n.z);
+    // UV 依最終位置線性分配：平面佔大部分貼圖，靠邊作畫不會被壓到圓角上
+    const [au, av] = AX[Math.min(5, Math.floor(i / per))];
+    const remap = (old: number, axis: number) => {
+      const o = p0.getComponent(axis) / size[axis];
+      const dir = Math.abs(o) < 1e-6 ? 1 : Math.sign((old - 0.5) * o) || 1;
+      return 0.5 + dir * (p.getComponent(axis) / size[axis]);
+    };
+    uv.setXY(i, remap(uv.getX(i), au), remap(uv.getY(i), av));
   }
+  uv.needsUpdate = true;
   pos.needsUpdate = true;
   nor.needsUpdate = true;
   return g;

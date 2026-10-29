@@ -19,7 +19,7 @@ for (const s of SIZES) {
     await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __bt: { paintRoom: { isSettled: boolean } } }).__bt.paintRoom.isSettled);
     const b = bt(page);
-    await page.getByRole('button', { name: '套用臉部範例：歪嘴挑眉' }).click();
+    await page.getByRole('button', { name: '套用範例：歪嘴挑眉' }).click();
     await page.getByRole('button', { name: '紅', exact: true }).click();
     await page.getByRole('button', { name: '粗', exact: true }).click();
     await drag(page, (await b.point('torso', 4, 0.5, 0.1))!, (await b.point('torso', 4, 0.5, 0.85))!);

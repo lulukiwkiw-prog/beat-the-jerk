@@ -9,8 +9,9 @@ import { dispatch } from '../state/app';
 import { enabledB, useSession } from '../state/session';
 import { resetBubbleScale } from '../ui/bubble';
 import { NoWebGL } from '../ui/NoWebGL';
-import { FacePresetButton } from '../ui/FacePresetButton';
-import { FACE_PRESETS } from '../game/puppet/facePresets';
+import { LookButton } from '../ui/LookButton';
+import { LOOK_KINDS, looksOf, type LookKind } from '../game/puppet/looks/presets';
+import { Segmented } from '../ui/Segmented';
 
 type Brush = (typeof PAINT.brushes)[number]['id'];
 
@@ -32,6 +33,8 @@ export function PaintScreen() {
   const [finishing, setFinishing] = useState(false);
   const [line, setLine] = useState<string | null>(null);
   const [gl] = useState(webglSupported);
+  const [lookKind, setLookKind] = useState<LookKind>('face');
+  const [acc, setAcc] = useState(paint.accessories);
 
   useEffect(() => {
     if (!gl || !stageRef.current) return;
@@ -43,9 +46,14 @@ export function PaintScreen() {
     ctrl.current = c;
     c.setBubble(bubbleRef.current);
     if (import.meta.env.DEV) (window as unknown as { __bt: unknown }).__bt = { paint, paintRoom: c };
-    const off = paint.onChange(() => setHist({ undo: paint.history.canUndo, redo: paint.history.canRedo }));
+    const off = paint.onChange(() => {
+      setHist({ undo: paint.history.canUndo, redo: paint.history.canRedo });
+      setAcc(paint.accessories);
+    });
+    const offAcc = paint.onAccessories(() => setAcc(paint.accessories));
     return () => {
       off();
+      offAcc();
       c.dispose();
       ctrl.current = null;
     };
@@ -128,22 +136,27 @@ export function PaintScreen() {
             </div>
           </div>
           <div className="tool-group">
-            <span className="tool-label">臉部範例（疊畫在臉上，可以再修改或復原）</span>
+            <span className="tool-label">範例（疊畫在原本的畫上，可以再修改或復原）</span>
+            <Segmented<LookKind> label="範例類別" value={lookKind} onChange={setLookKind} options={LOOK_KINDS.map((k) => ({ value: k.kind, label: k.label }))} />
             <div className="face-row">
-              {FACE_PRESETS.map((f) => (
-                <FacePresetButton
-                  key={f.id}
-                  id={f.id}
-                  label={f.label}
+              {looksOf(lookKind).map((l) => (
+                <LookButton
+                  key={l.id}
+                  look={l}
                   disabled={finishing}
                   onPick={(id) => {
-                    paint.applyFace(id);
-                    ctrl.current?.faceFront();
-                    setStatus(`畫上了：${f.label}`);
+                    paint.applyLook(id);
+                    if (l.kind !== 'costume' || !zoom) ctrl.current?.faceFront();
+                    setStatus(`換上了：${l.label}`);
                   }}
                 />
               ))}
             </div>
+            {acc[lookKind] && (
+              <button type="button" className="btn small" onClick={() => paint.removeAccessory(lookKind)} disabled={finishing}>
+                拿掉立體配件
+              </button>
+            )}
           </div>
           <div className="tool-group">
             <span className="tool-label">部位</span>
@@ -175,7 +188,7 @@ export function PaintScreen() {
             </div>
             {confirmClear && (
               <div className="confirm" role="alert">
-                確定清空全部彩繪？
+                確定清空全部彩繪和立體配件？
                 <button
                   type="button"
                   className="btn warn small"

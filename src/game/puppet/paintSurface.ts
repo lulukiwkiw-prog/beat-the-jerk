@@ -3,8 +3,9 @@ import { PAINT } from '../../config/paint.config';
 import { PUPPET } from '../../config/puppet.config';
 import { History } from './history';
 import { PAINT_PARTS, PART_DEFS, type PaintPartId } from './parts';
-import { atlasHeight, atlasWidth, cellOrigin, DEFAULT_LAYOUT, FACE_FRONT, faceDims, FACES, type Face, type FacePoint } from './faces';
-import { drawFacePreset, type FacePresetId } from './facePresets';
+import { atlasHeight, atlasWidth, cellOrigin, DEFAULT_LAYOUT, faceDims, FACES, type Face, type FacePoint } from './faces';
+import type { AccessoryId, AccessorySlot } from './looks/accessories';
+import { lookById } from './looks/presets';
 
 export interface Surface {
   part: PaintPartId;
@@ -22,13 +23,20 @@ export interface BrushSpec {
 }
 
 type FaceKey = `${PaintPartId}:${Face}`;
+type AccKey = `acc:${AccessorySlot}`;
+type HistKey = FaceKey | AccKey;
+type HistData = ImageData | AccessoryId | null;
+export type AccessoryState = Record<AccessorySlot, AccessoryId | null>;
 
 /**
  * 十個部位的彩繪貼圖（每部位一張 3×2 格）。彩繪室與擂台共用同一份。
  */
 export class PaintStore {
   readonly surfaces: Record<PaintPartId, Surface>;
-  readonly history: History<FaceKey, ImageData>;
+  readonly history: History<HistKey, HistData>;
+  /** 3D 凸出配件：每一類最多一個 */
+  accessories: AccessoryState = { face: null, hair: null, costume: null };
+  private accListeners = new Set<() => void>();
   /** 曾被畫過的面（清空時只需記錄這些） */
   private touched = new Set<FaceKey>();
   private listeners = new Set<() => void>();
@@ -48,10 +56,13 @@ export class PaintStore {
       surfaces[part] = { part, size: PART_DEFS[part].size, canvas, ctx, texture, dirty: false };
     }
     this.surfaces = surfaces;
-    this.history = new History<FaceKey, ImageData>(
+    this.history = new History<HistKey, HistData>(
       PAINT.undoSteps,
-      (key) => this.captureFace(key),
-      (key, data) => this.restoreFace(key, data),
+      (key) => (isAcc(key) ? this.accessories[slotOf(key)] : this.captureFace(key)),
+      (key, data) => {
+        if (isAcc(key)) this.setAccessory(slotOf(key), data as AccessoryId | null);
+        else this.restoreFace(key, data as ImageData);
+      },
     );
   }
 
@@ -59,6 +70,18 @@ export class PaintStore {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
+  /** 配件改變時通知（積木人據此重建 3D 配件） */
+  onAccessories(fn: () => void) {
+    this.accListeners.add(fn);
+    return () => this.accListeners.delete(fn);
+  }
+
+  private setAccessory(slot: AccessorySlot, id: AccessoryId | null) {
+    if (this.accessories[slot] === id) return;
+    this.accessories = { ...this.accessories, [slot]: id };
+    this.accListeners.forEach((fn) => fn());
+  }
+
   private emit() {
     this.listeners.forEach((fn) => fn());
   }
@@ -145,19 +168,40 @@ export class PaintStore {
     });
   }
 
-  /** 套用臉部範例：疊畫在頭部正面，可復原（算 1 步）。 */
-  applyFace(id: FacePresetId) {
-    const key: FaceKey = `head:${FACE_FRONT}`;
-    this.history.record([key]);
-    this.touched.add(key);
-    this.withFace('head', FACE_FRONT, (c, w, h) => drawFacePreset(id, c, w, h));
+  /**
+   * 套用範例：彩繪疊畫在原本的畫上，3D 配件換成這個範例的；整個算 1 步，可復原。
+   */
+  applyLook(id: string) {
+    const look = lookById(id);
+    if (!look) return;
+    const faceKeys: FaceKey[] = [];
+    for (const part of Object.keys(look.paint) as PaintPartId[])
+      for (const f of Object.keys(look.paint[part]!).map(Number) as Face[]) faceKeys.push(`${part}:${f}`);
+    const accKey: AccKey = `acc:${look.kind}`;
+    this.history.record([...faceKeys, accKey]);
+    for (const k of faceKeys) {
+      this.touched.add(k);
+      const [part, f] = this.parse(k);
+      const draw = look.paint[part]![f]!;
+      this.withFace(part, f, (c, w, h) => draw(c, w, h));
+    }
+    this.setAccessory(look.kind, look.accessory);
+    this.emit();
+  }
+
+  /** 拿掉某一類的 3D 配件（可復原）。 */
+  removeAccessory(slot: AccessorySlot) {
+    if (!this.accessories[slot]) return;
+    this.history.record([`acc:${slot}`]);
+    this.setAccessory(slot, null);
     this.emit();
   }
 
   /** 清空全部彩繪（可復原，算 1 步）。 */
   clearAll() {
-    const keys = [...this.touched];
+    const keys: HistKey[] = [...this.touched, 'acc:face', 'acc:hair', 'acc:costume'];
     this.history.record(keys);
+    (['face', 'hair', 'costume'] as const).forEach((sl) => this.setAccessory(sl, null));
     for (const part of PAINT_PARTS) {
       const s = this.surfaces[part];
       s.ctx.fillStyle = PUPPET.baseColor;
@@ -203,6 +247,9 @@ export class PaintStore {
     return n;
   }
 }
+
+const isAcc = (k: HistKey): k is AccKey => k.startsWith('acc:');
+const slotOf = (k: AccKey) => k.slice(4) as AccessorySlot;
 
 function hexToRgb(hex: string): [number, number, number] {
   const v = parseInt(hex.slice(1), 16);

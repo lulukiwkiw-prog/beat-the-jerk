@@ -108,7 +108,7 @@ test('臉部範例：疊畫在頭部正面，可以復原', async ({ page }) => 
   await drag(page, (await b.point('head', 4, 0.1, 0.1))!, (await b.point('head', 4, 0.9, 0.1))!);
   const mine = await b.painted('head', 4);
   expect(mine).toBeGreaterThan(100);
-  await page.getByRole('button', { name: '套用臉部範例：鬥雞眼暴牙' }).click();
+  await page.getByRole('button', { name: '套用範例：鬥雞眼暴牙' }).click();
   const withFace = await b.painted('head', 4);
   expect(withFace).toBeGreaterThan(mine + 2000);
   // 疊在原本的畫上：原本的筆畫還在（復原後回到只有原本那一筆）
@@ -118,5 +118,39 @@ test('臉部範例：疊畫在頭部正面，可以復原', async ({ page }) => 
   expect(await b.painted('head', 4)).toBe(withFace);
   // 其他面不受影響
   for (const f of [0, 1, 2, 3, 5]) expect(await b.painted('head', f)).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('髮型、服裝範例：3D 配件可復原，進擂台也穿著', async ({ page }) => {
+  const errors = watchConsole(page);
+  await fillWanted(page);
+  const b = bt(page);
+  const acc = () => page.evaluate(() => (window as unknown as { __bt: { paintRoom: { puppet: { accessoryCount: number } } } }).__bt.paintRoom.puppet.accessoryCount);
+  await page.getByRole('radio', { name: '髮型' }).click();
+  await page.getByRole('button', { name: '套用範例：綁馬尾' }).click();
+  expect(await acc()).toBe(1);
+  expect(await b.painted('head', 2)).toBeGreaterThan(1000);
+  // 同一類換一款：配件換掉，不會疊兩頂
+  await page.getByRole('button', { name: '套用範例：金色蓬蓬旁分' }).click();
+  expect(await acc()).toBe(1);
+  await page.getByRole('radio', { name: '服裝' }).click();
+  await page.getByRole('button', { name: '套用範例：恐龍裝' }).click();
+  expect(await acc()).toBe(2);
+  // 復原：連 3D 配件一起還原
+  await page.getByRole('button', { name: '復原', exact: true }).click();
+  expect(await acc()).toBe(1);
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  expect(await acc()).toBe(2);
+  await page.getByRole('button', { name: '拿掉立體配件' }).click();
+  expect(await acc()).toBe(1);
+  await page.getByRole('button', { name: '復原', exact: true }).click();
+  expect(await acc()).toBe(2);
+  // 進決鬥：同樣穿著
+  await page.getByTestId('go-duel').click();
+  await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
+  const skip = page.getByRole('button', { name: '略過' });
+  if (await skip.isVisible()) await skip.click();
+  await page.getByTestId('begin-battle').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __bt: { battle?: { puppet: { accessoryCount: number } } } }).__bt.battle?.puppet.accessoryCount ?? 0)).toBe(2);
   expect(errors).toEqual([]);
 });
