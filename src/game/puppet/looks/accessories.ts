@@ -1,5 +1,5 @@
 import {
-  BufferGeometry, CircleGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshStandardMaterial, Object3D, SphereGeometry, TorusGeometry,
+  BufferGeometry, CanvasTexture, CircleGeometry, SRGBColorSpace, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshStandardMaterial, Object3D, SphereGeometry, TorusGeometry,
 } from 'three';
 import { plastic, srgb } from '../../three/color';
 import { cachedRoundedBox } from '../../three/geometry';
@@ -76,6 +76,41 @@ function ball(r: number, color: string, x: number, y: number, z: number, scale: 
   return m;
 }
 
+let teruMat: MeshStandardMaterial | null = null;
+/** 晴天娃娃的臉：畫在球面貼圖正面（u＝0.25 是 +Z） */
+function teruFaceMaterial() {
+  if (teruMat) return teruMat;
+  const cv = document.createElement('canvas');
+  cv.width = 512;
+  cv.height = 256;
+  const c = cv.getContext('2d')!;
+  c.fillStyle = '#FFFFFF';
+  c.fillRect(0, 0, 512, 256);
+  const cx = 128;
+  c.fillStyle = '#1E1E1E';
+  for (const dx of [-22, 22]) {
+    c.beginPath();
+    c.arc(cx + dx, 112, 7, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.strokeStyle = '#1E1E1E';
+  c.lineWidth = 5;
+  c.lineCap = 'round';
+  c.beginPath();
+  c.arc(cx, 128, 18, 0.15 * Math.PI, 0.85 * Math.PI);
+  c.stroke();
+  c.fillStyle = 'rgba(244,143,177,.75)';
+  for (const dx of [-40, 40]) {
+    c.beginPath();
+    c.ellipse(cx + dx, 136, 10, 7, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+  const tex = new CanvasTexture(cv);
+  tex.colorSpace = SRGBColorSpace;
+  teruMat = new MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0 });
+  return teruMat;
+}
+
 /** 貼著圓頭頂的髮蓋（扁圓頂），h 為厚度 */
 function dome(color: string, h: number) {
   return ball(1, color, 0, HEAD.top - 0.04, -0.02, [0.64, h, 0.6]);
@@ -110,13 +145,21 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
     return [{ part: 'head', object: group(snout, ...ears) }];
   },
   teruteru: () => {
-    const skirt = new Mesh(geo('teruSkirt', () => new CylinderGeometry(0.5, 1.15, 0.95, 20, 1, true)), cloth('#FFFFFF'));
-    skirt.position.y = -HEAD.top - 0.42;
+    // 圓球頭：包住圓柱頭，臉畫在球的正面；抵銷頭部的上下縮放，維持正圓
+    const [dw, dh, dd] = DESIGN_SIZES.head;
+    const [w, h] = PART_DEFS.head.size;
+    const keep = w / ((dw + dd) / 2) / (h / dh);
+    const head = new Mesh(geo('teruBall', () => new SphereGeometry(0.82, 40, 24)), teruFaceMaterial());
+    head.position.y = 0.04;
+    head.scale.set(1, keep, 1);
+    head.castShadow = true;
+    const skirt = new Mesh(geo('teruSkirt2', () => new CylinderGeometry(0.4, 1.15, 0.85, 24, 1, true)), cloth('#FFFFFF'));
+    skirt.position.y = -1.12;
     skirt.castShadow = true;
-    const ribbon = new Mesh(geo('teruRibbon', () => new TorusGeometry(0.5, 0.05, 8, 24)), plastic('#E53935'));
+    const ribbon = new Mesh(geo('teruRibbon2', () => new TorusGeometry(0.42, 0.05, 8, 24)), plastic('#E53935'));
     ribbon.rotation.x = Math.PI / 2;
-    ribbon.position.y = -HEAD.top + 0.02;
-    return [{ part: 'head', object: group(skirt, ribbon) }];
+    ribbon.position.y = -0.7;
+    return [{ part: 'head', object: group(head, skirt, ribbon) }];
   },
   chickenHead: () => {
     const RED = '#E8452C';

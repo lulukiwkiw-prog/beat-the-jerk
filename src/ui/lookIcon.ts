@@ -74,8 +74,18 @@ function overlayDesign(c: CanvasRenderingContext2D, id: AccessoryId) {
       e('#8E4A5A', 0.1, 4.05, 0.05, 0.07);
       break;
     case 'teruteru':
-      poly('#FFFFFF', [[-0.5, 3.62], [0.5, 3.62], [1.15, 2.7], [-1.15, 2.7]]);
-      r('#E53935', 0, 3.62, 1.0, 0.08);
+      poly('#FFFFFF', [[-0.34, 3.5], [0.34, 3.5], [1.1, 2.7], [-1.1, 2.7]]);
+      e('#FFFFFF', 0, 4.21, 0.66, 0.66);
+      e('#1E1E1E', -0.13, 4.3, 0.045, 0.045);
+      e('#1E1E1E', 0.13, 4.3, 0.045, 0.045);
+      c.strokeStyle = '#1E1E1E';
+      c.lineWidth = 0.035;
+      c.beginPath();
+      c.arc(0, 4.2, 0.11, 1.15 * Math.PI, 1.85 * Math.PI);
+      c.stroke();
+      e('rgba(244,143,177,.75)', -0.25, 4.15, 0.06, 0.04);
+      e('rgba(244,143,177,.75)', 0.25, 4.15, 0.06, 0.04);
+      r('#E53935', 0, 3.55, 0.75, 0.08);
       break;
     case 'chickenHead':
       e('#FFD23F', 0, top - 0.05, 0.62, 0.3);
@@ -157,7 +167,7 @@ export function drawLookIcon(cv: HTMLCanvasElement, look: LookPreset) {
   c.clearRect(0, 0, cv.width, cv.height);
   c.setTransform(s, 0, 0, -s, cv.width / 2 - v.cx * s, cv.height / 2 + v.cy * s);
   // 立體配件中在身體後面的部分（長髮、裙子）先畫，再畫身體
-  const behind: AccessoryId[] = ['longHair', 'ponytail', 'dinoSuit', 'teruteru'];
+  const behind: AccessoryId[] = ['longHair', 'ponytail', 'dinoSuit'];
   if (look.accessory && behind.includes(look.accessory)) overlay(c, look.accessory);
   for (const [part, [x, y, w, h]] of Object.entries(LAYOUT)) {
     const fixed = part.startsWith('hand') || part.startsWith('shoe') || part === 'neck';
@@ -184,5 +194,4 @@ export function drawLookIcon(cv: HTMLCanvasElement, look: LookPreset) {
     }
   }
   if (look.accessory && !behind.includes(look.accessory)) overlay(c, look.accessory);
-  if (look.accessory === 'teruteru') overlay(c, 'teruteru');
 }
