@@ -1,4 +1,4 @@
-import { BoxGeometry, BufferGeometry, CylinderGeometry, Vector3 } from 'three';
+import { BoxGeometry, BufferGeometry, CylinderGeometry, Float32BufferAttribute, Vector3 } from 'three';
 import { atlasUV } from '../puppet/faces';
 
 const SEG = 8;
@@ -97,4 +97,99 @@ let studGeo: CylinderGeometry | null = null;
 export function studGeometry(): CylinderGeometry {
   if (!studGeo) studGeo = new CylinderGeometry(STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 18);
   return studGeo;
+}
+
+/**
+ * 可彩繪的圓角圓柱（積木人的頭）：側面依方向分成四格（正面 +Z、右 +X、背面 −Z、左 −X），
+ * 頂面、底面各一格，沿用方塊的 3×2 圖集。上下邊緣是圓角。
+ * 四段側面各自有頂點，接縫處不會把相鄰格的貼圖混在一起。
+ */
+export function roundedCylinderAtlas(R: number, H: number, r: number, arcSeg = 10, filletSeg = 4, straightSeg = 4, capRings = 3): BufferGeometry {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const half = H / 2;
+  // 側面輪廓：從底部圓角內緣，經直立段，到頂部圓角內緣
+  const profile: { rho: number; y: number; nr: number; ny: number }[] = [];
+  for (let i = 0; i <= filletSeg; i++) {
+    const a = -Math.PI / 2 + (i / filletSeg) * (Math.PI / 2);
+    profile.push({ rho: R - r + Math.cos(a) * r, y: -half + r + Math.sin(a) * r, nr: Math.cos(a), ny: Math.sin(a) });
+  }
+  for (let i = 1; i < straightSeg; i++) profile.push({ rho: R, y: -half + r + (i / straightSeg) * (H - 2 * r), nr: 1, ny: 0 });
+  for (let i = 0; i <= filletSeg; i++) {
+    const a = (i / filletSeg) * (Math.PI / 2);
+    profile.push({ rho: R - r + Math.cos(a) * r, y: half - r + Math.sin(a) * r, nr: Math.cos(a), ny: Math.sin(a) });
+  }
+  // 側面四格：θ 從 +Z 往 +X 量
+  const SIDES: [number, number][] = [[4, -Math.PI / 4], [0, Math.PI / 4], [5, (3 * Math.PI) / 4], [1, (5 * Math.PI) / 4]];
+  for (const [face, start] of SIDES) {
+    const base = pos.length / 3;
+    for (let j = 0; j < profile.length; j++) {
+      const p = profile[j];
+      for (let i = 0; i <= arcSeg; i++) {
+        const t = i / arcSeg;
+        const th = start + t * (Math.PI / 2);
+        const sx = Math.sin(th);
+        const cz = Math.cos(th);
+        pos.push(p.rho * sx, p.y, p.rho * cz);
+        nor.push(p.nr * sx, p.ny, p.nr * cz);
+        const [u, v] = atlasUV(face, t, (p.y + half) / H);
+        uv.push(u, v);
+      }
+    }
+    const row = arcSeg + 1;
+    for (let j = 0; j < profile.length - 1; j++)
+      for (let i = 0; i < arcSeg; i++) {
+        const a = base + j * row + i;
+        idx.push(a, a + 1, a + row, a + 1, a + row + 1, a + row);
+      }
+  }
+  // 頂面、底面：圓盤，平面對應到該格
+  const ring = 4 * arcSeg;
+  for (const top of [true, false]) {
+    const face = top ? 2 : 3;
+    const y = top ? half : -half;
+    const ny = top ? 1 : -1;
+    const center = pos.length / 3;
+    pos.push(0, y, 0);
+    nor.push(0, ny, 0);
+    uv.push(...atlasUV(face, 0.5, 0.5));
+    for (let k = 1; k <= capRings; k++) {
+      const rr = ((R - r) * k) / capRings;
+      for (let i = 0; i < ring; i++) {
+        const th = (i / ring) * Math.PI * 2;
+        const x = rr * Math.sin(th);
+        const z = rr * Math.cos(th);
+        pos.push(x, y, z);
+        nor.push(0, ny, 0);
+        const a = (x + R) / (2 * R);
+        const b = top ? (R - z) / (2 * R) : (z + R) / (2 * R);
+        uv.push(...atlasUV(face, a, b));
+      }
+    }
+    for (let k = 0; k < capRings; k++)
+      for (let i = 0; i < ring; i++) {
+        const i2 = (i + 1) % ring;
+        if (k === 0) {
+          const a = center + 1 + i;
+          const b = center + 1 + i2;
+          if (top) idx.push(center, a, b);
+          else idx.push(center, b, a);
+        } else {
+          const inner = center + 1 + (k - 1) * ring;
+          const outer = center + 1 + k * ring;
+          const q = [inner + i, outer + i, outer + i2, inner + i2];
+          if (top) idx.push(q[0], q[1], q[2], q[0], q[2], q[3]);
+          else idx.push(q[0], q[2], q[1], q[0], q[3], q[2]);
+        }
+      }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  return g;
 }

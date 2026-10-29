@@ -226,50 +226,11 @@ const teruteru: Draw = (c, w) => {
 };
 
 const CHICK = '#FFD23F';
-/** 崩潰尖叫的橡膠雞：圓白眼往上看、嘴巴張成直立長橢圓 */
-const chickenFace: Draw = (c, w) => {
-  for (const x of [w * 0.3, w * 0.7]) {
-    eyeWhite(c, x, 0.27, 0.15);
-    dot(c, x + (x < w / 2 ? 0.03 : -0.01), 0.2, 0.055, INK);
-  }
-  // 張到最大的嘴：橘色嘴喙外圈＋深紅嘴裡＋舌頭
-  ellipse(c, w * 0.5, 0.74, 0.3, 0.36, '#F57C00');
-  stroke(c, 0.035);
-  c.beginPath();
-  c.ellipse(w * 0.5, 0.74, 0.3, 0.36, 0, 0, Math.PI * 2);
-  c.stroke();
-  ellipse(c, w * 0.5, 0.77, 0.2, 0.27, '#5A1414');
-  c.save();
-  c.beginPath();
-  c.ellipse(w * 0.5, 0.77, 0.2, 0.27, 0, 0, Math.PI * 2);
-  c.clip();
-  ellipse(c, w * 0.5, 0.99, 0.15, 0.1, '#E25A4E');
-  c.restore();
-  ellipse(c, w * 0.36, 0.56, 0.05, 0.03, 'rgba(255,255,255,.55)', -0.6);
-};
-
-const DINO = '#6BBF59';
-const dinoFace: Draw = (c, w) => {
-  for (const x of [w * 0.28, w * 0.72]) {
-    ellipse(c, x, 0.38, 0.11, 0.09, '#FFE45C');
-    ellipse(c, x, 0.38, 0.025, 0.08, INK);
-  }
-  dot(c, w * 0.42, 0.58, 0.025, '#2E5A26');
-  dot(c, w * 0.58, 0.58, 0.025, '#2E5A26');
-  rect(c, w * 0.18, 0.74, w * 0.64, 0.14, '#2E1A16');
-  c.fillStyle = WHITE;
-  for (let i = 0; i < 6; i++) {
-    const x = w * 0.2 + i * w * 0.1;
-    c.beginPath();
-    c.moveTo(x, 0.74);
-    c.lineTo(x + w * 0.05, 0.82);
-    c.lineTo(x + w * 0.1, 0.74);
-    c.fill();
-    c.beginPath();
-    c.moveTo(x, 0.88);
-    c.lineTo(x + w * 0.05, 0.81);
-    c.lineTo(x + w * 0.1, 0.88);
-    c.fill();
+const DINO = '#5FAE4E';
+const dinoEyes: Draw = (c, w) => {
+  for (const x of [w * 0.26, w * 0.74]) {
+    ellipse(c, x, 0.3, 0.12, 0.1, '#FFE45C');
+    ellipse(c, x, 0.3, 0.028, 0.09, INK);
   }
 };
 
@@ -368,19 +329,6 @@ const crease: Draw = (c, w, h) => {
   c.stroke();
 };
 
-const belly = (color: string, lines?: string): Draw => (c, w, h) => {
-  ellipse(c, w / 2, h * 0.58, w * 0.32, h * 0.38, color);
-  if (lines) {
-    stroke(c, 0.03, lines);
-    c.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const y = h * (0.32 + i * 0.14);
-      c.moveTo(w * 0.3, y);
-      c.lineTo(w * 0.7, y);
-    }
-    c.stroke();
-  }
-};
 const hoof = (color: string): Draw => fillBottom(color, 0.22);
 
 const dressTop = (trim: string): Draw => (c, w, h) => {
@@ -416,8 +364,8 @@ export const LOOKS: LookPreset[] = [
   { id: 'wink', kind: 'face', label: '眨眼雀斑', paint: { head: { [F.PZ]: wink } }, accessory: null },
   { id: 'pigHead', kind: 'face', label: '豬頭', paint: { head: whole(PIG, pigFace) }, accessory: 'pigHead' },
   { id: 'teruteru', kind: 'face', label: '晴天娃娃', paint: { head: whole(WHITE, teruteru) }, accessory: 'teruteru' },
-  { id: 'chickenHead', kind: 'face', label: '尖叫雞', paint: { head: whole(CHICK, chickenFace) }, accessory: 'chickenHead' },
-  { id: 'dinoHead', kind: 'face', label: '恐龍頭', paint: { head: whole(DINO, dinoFace) }, accessory: 'dinoHead' },
+  { id: 'chickenHead', kind: 'face', label: '尖叫雞', paint: { head: whole(CHICK) }, accessory: 'chickenHead' },
+  { id: 'dinoHead', kind: 'face', label: '恐龍頭', paint: { head: whole(DINO, dinoEyes) }, accessory: 'dinoHead' },
   // 髮型
   { id: 'longHair', kind: 'hair', label: '長髮', paint: { head: hairPaint(BROWN, { sides: 1, back: 1, front: fringe(BROWN, 0.28) }) }, accessory: 'longHair' },
   { id: 'shortHair', kind: 'hair', label: '短髮', paint: { head: hairPaint(DARK, { sides: 0.42, back: 0.55, front: fringe(DARK, 0.22) }) }, accessory: 'shortHair' },
@@ -425,9 +373,9 @@ export const LOOKS: LookPreset[] = [
   { id: 'ponytail', kind: 'hair', label: '綁馬尾', paint: { head: hairPaint(BROWN, { sides: 0.45, back: 0.7, front: sidePart(BROWN) }) }, accessory: 'ponytail' },
   { id: 'swoop', kind: 'hair', label: '金色蓬蓬旁分', paint: { head: hairPaint(BLOND, { sides: 0.5, back: 0.55, front: sidePart(BLOND) }) }, accessory: 'swoop' },
   { id: 'slick', kind: 'hair', label: '西裝頭', paint: { head: hairPaint(INK, { sides: 0.35, back: 0.5, front: sidePart(INK) }) }, accessory: 'slick' },
-  { id: 'buzz', kind: 'hair', label: '平頭', paint: { head: { [F.PY]: buzz('#2B2B33'), [F.PX]: all(fillTop('#6E6E76', 0.35)), [F.NX]: fillTop('#6E6E76', 0.35), [F.NZ]: fillTop('#6E6E76', 0.4), [F.PZ]: fillTop('#6E6E76', 0.1) } }, accessory: 'buzz' },
+  { id: 'buzz', kind: 'hair', label: '平頭', paint: { head: { [F.PY]: buzz('#2B2B33'), [F.PX]: all(fillTop('#6E6E76', 0.35)), [F.NX]: fillTop('#6E6E76', 0.35), [F.NZ]: fillTop('#6E6E76', 0.4), [F.PZ]: fillTop('#6E6E76', 0.2) } }, accessory: 'buzz' },
   // 服裝
-  { id: 'chickenSuit', kind: 'costume', label: '尖叫雞', paint: body({ torso: CHICK, arms: CHICK, legs: CHICK }, belly('#FFE680')), accessory: 'chickenSuit' },
+  { id: 'chickenSuit', kind: 'costume', label: '尖叫雞', paint: body({ torso: CHICK, arms: CHICK, legs: CHICK }), accessory: 'chickenSuit' },
   {
     id: 'suit', kind: 'costume', label: '西裝',
     paint: body({ torso: NAVY, arms: NAVY, legs: NAVY }, suitFront, {
@@ -450,14 +398,14 @@ export const LOOKS: LookPreset[] = [
   },
   {
     id: 'pigBody', kind: 'costume', label: '豬身體',
-    paint: body({ torso: PIG, arms: PIG, legs: PIG }, belly('#F8C8D4'), {
+    paint: body({ torso: PIG, arms: PIG, legs: PIG }, undefined, {
       foreArmL: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')) }, foreArmR: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')) },
       shinL: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')), [F.PX]: all(fill(PIG), hoof('#8E5A66')), [F.NX]: all(fill(PIG), hoof('#8E5A66')) },
       shinR: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')), [F.PX]: all(fill(PIG), hoof('#8E5A66')), [F.NX]: all(fill(PIG), hoof('#8E5A66')) },
     }),
     accessory: 'pigBody',
   },
-  { id: 'dinoSuit', kind: 'costume', label: '恐龍裝', paint: body({ torso: DINO, arms: DINO, legs: DINO }, belly('#F7E27A', '#D9B93A')), accessory: 'dinoSuit' },
+  { id: 'dinoSuit', kind: 'costume', label: '恐龍裝', paint: body({ torso: DINO, arms: DINO, legs: DINO }), accessory: 'dinoSuit' },
 ];
 
 export const LOOK_KINDS: { kind: LookKind; label: string }[] = [

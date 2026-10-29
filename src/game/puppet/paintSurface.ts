@@ -2,7 +2,7 @@ import { CanvasTexture, SRGBColorSpace, type Texture } from 'three';
 import { PAINT } from '../../config/paint.config';
 import { PUPPET } from '../../config/puppet.config';
 import { History } from './history';
-import { PAINT_PARTS, PART_DEFS, type PaintPartId } from './parts';
+import { DESIGN_SIZES, PAINT_PARTS, PART_DEFS, partFaceDims, type PaintPartId } from './parts';
 import { atlasHeight, atlasWidth, cellOrigin, DEFAULT_LAYOUT, faceDims, FACES, type Face, type FacePoint } from './faces';
 import type { AccessoryId, AccessorySlot } from './looks/accessories';
 import { lookById } from './looks/presets';
@@ -130,7 +130,7 @@ export class PaintStore {
   withFace(part: PaintPartId, f: Face, fn: (ctx: CanvasRenderingContext2D, w: number, h: number) => void) {
     const s = this.surfaces[part];
     const o = cellOrigin(f);
-    const [fw, fh] = faceDims(s.size, f);
+    const [fw, fh] = partFaceDims(part, f);
     const r = this.faceRect(f);
     const c = s.ctx;
     c.save();
@@ -183,7 +183,12 @@ export class PaintStore {
       this.touched.add(k);
       const [part, f] = this.parse(k);
       const draw = look.paint[part]![f]!;
-      this.withFace(part, f, (c, w, h) => draw(c, w, h));
+      this.withFace(part, f, (c, w, h) => {
+        // 範例以設計尺寸畫，再縮放到實際部位
+        const [dw, dh] = faceDims(DESIGN_SIZES[part], f);
+        c.scale(w / dw, h / dh);
+        draw(c, dw, dh);
+      });
     }
     this.setAccessory(look.kind, look.accessory);
     this.emit();
@@ -229,6 +234,24 @@ export class PaintStore {
     const ok = this.history.redo();
     this.emit();
     return ok;
+  }
+
+  /** 取某部位某一面中心附近的平均顏色（#RRGGBB） */
+  sampleColor(part: PaintPartId, f: Face): string {
+    const o = cellOrigin(f);
+    const c = DEFAULT_LAYOUT.cell;
+    const d = this.surfaces[part].ctx.getImageData(o.x + c * 0.3, o.y + c * 0.3, c * 0.4, c * 0.4).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    const n = d.length / 4;
+    for (let i = 0; i < d.length; i += 4) {
+      r += d[i];
+      g += d[i + 1];
+      b += d[i + 2];
+    }
+    const hx = (v: number) => Math.round(v / n).toString(16).padStart(2, '0');
+    return `#${hx(r)}${hx(g)}${hx(b)}`;
   }
 
   /** 測試用：計算某部位不是底色的像素數。 */

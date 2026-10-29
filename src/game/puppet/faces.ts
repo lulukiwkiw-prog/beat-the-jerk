@@ -68,10 +68,15 @@ export function uvToFacePoint(
   size: readonly [number, number, number],
   L: AtlasLayout = DEFAULT_LAYOUT,
 ): FacePoint {
+  return uvToFacePointDims(u, v, f, faceDims(size, f), L);
+}
+
+/** 同上，但直接給該面的實際尺寸（圓柱的側面是弧長）。 */
+export function uvToFacePointDims(u: number, v: number, f: Face, dims: readonly [number, number], L: AtlasLayout = DEFAULT_LAYOUT): FacePoint {
   const s = slot(L);
   const a = (u * atlasWidth(L) - colOf(f) * s - L.gutter) / L.cell;
   const b = (v * atlasHeight(L) - rowOf(f) * s - L.gutter) / L.cell;
-  const [fw, fh] = faceDims(size, f);
+  const [fw, fh] = dims;
   const cl = (x: number) => Math.max(0, Math.min(1, x));
   return { x: cl(a) * fw, y: (1 - cl(b)) * fh };
 }

@@ -1,9 +1,9 @@
 import {
-  BufferGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshStandardMaterial, Object3D, TorusGeometry,
+  BufferGeometry, CircleGeometry, ConeGeometry, CylinderGeometry, DoubleSide, Group, Mesh, MeshStandardMaterial, Object3D, SphereGeometry, TorusGeometry,
 } from 'three';
 import { plastic, srgb } from '../../three/color';
 import { cachedRoundedBox } from '../../three/geometry';
-import type { FixedPartId, PaintPartId } from '../parts';
+import { DESIGN_SIZES, PART_DEFS, type FixedPartId, type PaintPartId } from '../parts';
 
 /**
  * 3D 凸出配件：掛在積木人的部位 mesh 底下，所以會跟著部位移動、壓扁與噴飛。
@@ -68,16 +68,45 @@ const group = (...children: Object3D[]) => {
 const HEAD = { top: 0.55, front: 0.55, back: -0.55, side: 0.61 };
 const TORSO = { bottom: -0.75, top: 0.75, back: -0.5, front: 0.5, side: 0.85 };
 
+function ball(r: number, color: string, x: number, y: number, z: number, scale: [number, number, number] = [1, 1, 1]) {
+  const m = new Mesh(geo('ball', () => new SphereGeometry(1, 24, 16)), plastic(color));
+  m.scale.set(r * scale[0], r * scale[1], r * scale[2]);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  return m;
+}
+
+/** 貼著圓頭頂的髮蓋（扁圓頂），h 為厚度 */
+function dome(color: string, h: number) {
+  return ball(1, color, 0, HEAD.top - 0.04, -0.02, [0.64, h, 0.6]);
+}
+
+/** 立體肚子：貼在軀幹正面的扁橢圓 */
+function belly(color: string) {
+  return ball(1, color, 0, -0.05, TORSO.front - 0.04, [0.6, 0.6, 0.2]);
+}
+
+/** 爪子／腳趾：一排小圓錐 */
+function claws(color: string, n: number, spread: number, y: number, z: number, len: number, rot: [number, number, number]) {
+  return group(...Array.from({ length: n }, (_, i) => cone(0.06, len, color, (i - (n - 1) / 2) * spread, y, z, rot)));
+}
+
+
 const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
   pigHead: () => {
-    const snout = box(0.52, 0.36, 0.22, 0.12, '#EE8FA6', 0, -0.08, HEAD.front + 0.08);
+    const PINK = '#EE8FA6';
+    // 大豬鼻：朝前的圓柱＋兩個鼻孔
+    const snout = new Mesh(geo('pigSnout', () => new CylinderGeometry(0.27, 0.29, 0.26, 24)), plastic(PINK));
+    snout.rotation.x = Math.PI / 2;
+    snout.position.set(0, -0.1, HEAD.front + 0.1);
+    snout.castShadow = true;
     for (const x of [-0.1, 0.1]) {
-      const n = new Mesh(geo('nostril', () => new CylinderGeometry(0.045, 0.045, 0.04, 12)), plastic('#8E4A5A'));
-      n.rotation.x = Math.PI / 2;
-      n.position.set(x, 0, 0.11);
+      const n = new Mesh(geo('nostril', () => new CylinderGeometry(0.05, 0.05, 0.04, 12)), plastic('#8E4A5A'));
+      n.position.set(x, 0.12, 0);
       snout.add(n);
     }
-    const ears = [-1, 1].map((s) => box(0.34, 0.34, 0.12, 0.06, '#EE8FA6', s * 0.42, HEAD.top + 0.1, 0.05, [0.2, 0, s * -0.55]));
+    // 往前垂的耳朵
+    const ears = [-1, 1].map((sx) => cone(0.2, 0.42, PINK, sx * 0.4, HEAD.top + 0.12, 0.08, [0.5, 0, sx * -0.5]));
     return [{ part: 'head', object: group(snout, ...ears) }];
   },
   teruteru: () => {
@@ -91,74 +120,98 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
   },
   chickenHead: () => {
     const RED = '#E8452C';
-    // 頭頂大雞冠：往後翹的兩片
+    const Y = '#FFD23F';
+    // 圓頭：頭頂加一個圓頂
+    const dome = ball(1, Y, 0, HEAD.top - 0.12, -0.02, [0.62, 0.42, 0.56]);
+    // 凸出來的大白眼珠，眼珠往上看
+    const eyes = [-1, 1].map((sx) => {
+      const e = ball(0.2, '#FFFFFF', sx * 0.3, 0.2, HEAD.front + 0.02);
+      const pupil = ball(0.075, '#1E1E1E', sx * 0.02, 0.09, 0.17);
+      e.add(pupil);
+      pupil.scale.multiplyScalar(1 / 0.2);
+      pupil.position.multiplyScalar(1 / 0.2);
+      return e;
+    });
+    // 張到最大的嘴：朝前的橘色喇叭管＋深色嘴裡
+    const beak = new Mesh(geo('chickBeak', () => new CylinderGeometry(0.3, 0.22, 0.42, 24, 1, true)), cloth('#F57C00'));
+    beak.rotation.x = Math.PI / 2;
+    beak.scale.set(0.9, 1, 1.35);
+    beak.position.set(0, -0.22, HEAD.front + 0.2);
+    const throat = new Mesh(geo('chickThroat', () => new CircleGeometry(0.22, 24)), plastic('#5A1414'));
+    throat.scale.set(0.9, 1.35, 1);
+    throat.position.set(0, -0.22, HEAD.front + 0.01);
     const comb = [
-      box(0.34, 0.66, 0.46, 0.15, RED, 0.04, HEAD.top + 0.28, -0.08, [-0.3, 0, -0.12]),
-      box(0.3, 0.46, 0.36, 0.13, RED, -0.06, HEAD.top + 0.18, 0.24, [-0.1, 0, 0.18]),
+      box(0.32, 0.6, 0.46, 0.15, RED, 0.04, HEAD.top + 0.4, -0.06, [-0.3, 0, -0.12]),
+      box(0.28, 0.42, 0.34, 0.13, RED, -0.06, HEAD.top + 0.3, 0.22, [-0.1, 0, 0.18]),
     ];
-    // 嘴喙上下唇凸出臉外，中間是畫上去的大張嘴
-    const upper = box(0.62, 0.13, 0.22, 0.06, '#F57C00', 0, 0.1, HEAD.front + 0.08, [-0.2, 0, 0]);
-    const lower = box(0.5, 0.12, 0.2, 0.05, '#EF6C00', 0, -0.5, HEAD.front + 0.06, [0.25, 0, 0]);
-    // 下巴雙瓣肉垂
-    const wattle = [-1, 1].map((sx) => box(0.22, 0.28, 0.14, 0.09, RED, sx * 0.12, -HEAD.top - 0.04, HEAD.front + 0.06, [0.3, 0, sx * 0.35]));
-    return [{ part: 'head', object: group(...comb, upper, lower, ...wattle) }];
+    const wattle = [-1, 1].map((sx) => ball(0.13, RED, sx * 0.11, -HEAD.top + 0.02, HEAD.front + 0.12, [1, 1.3, 0.8]));
+    return [{ part: 'head', object: group(dome, ...eyes, beak, throat, ...comb, ...wattle) }];
   },
   dinoHead: () => {
-    const spikes = [0.28, 0, -0.28, -0.52].map((z, i) => cone(0.13, 0.32 - i * 0.03, '#F28C28', 0, HEAD.top + 0.14, z, [-0.25, 0, 0]));
-    const brow = [-1, 1].map((s) => box(0.3, 0.1, 0.12, 0.04, '#4E9A40', s * 0.33, 0.27, HEAD.front + 0.03, [0, 0, s * 0.25]));
-    return [{ part: 'head', object: group(...spikes, ...brow) }];
+    const G = '#5FAE4E';
+    // 往前伸出的長嘴，下緣一排牙齒
+    const snout = box(1.0, 0.5, 0.75, 0.16, G, 0, -0.22, HEAD.front + 0.3);
+    const teeth = claws('#FFFFFF', 6, 0.15, -0.47, HEAD.front + 0.6, 0.14, [Math.PI, 0, 0]);
+    const nostrils = [-0.18, 0.18].map((x) => ball(0.05, '#2E5A26', x, 0.03, HEAD.front + 0.66));
+    const spikes = [0.3, 0.02, -0.26, -0.52].map((z, i) => cone(0.17, 0.42 - i * 0.04, '#F28C28', 0, HEAD.top + 0.18, z, [-0.25, 0, 0]));
+    const brow = [-1, 1].map((sx) => box(0.32, 0.1, 0.14, 0.04, '#4E9A40', sx * 0.33, 0.32, HEAD.front + 0.03, [0, 0, sx * 0.25]));
+    return [{ part: 'head', object: group(snout, teeth, ...nostrils, ...spikes, ...brow) }];
   },
   longHair: () => {
     const C = '#5A3A22';
-    const cap = box(1.34, 0.22, 1.24, 0.1, C, 0, HEAD.top + 0.08, 0);
-    const back = box(1.3, 1.9, 0.2, 0.08, C, 0, -0.35, HEAD.back - 0.08);
-    const locks = [-1, 1].map((s) => box(0.18, 1.55, 0.7, 0.08, C, s * (HEAD.side + 0.06), -0.25, -0.12));
+    const cap = dome(C, 0.26);
+    // 包住後腦、垂到肩下的半圈長髮
+    const back = new Mesh(geo('longHairShell', () => new CylinderGeometry(0.62, 0.7, 1.9, 24, 1, true, Math.PI / 2, Math.PI)), cloth(C));
+    back.position.y = -0.38;
+    back.castShadow = true;
+    const locks = [-1, 1].map((sx) => box(0.16, 1.2, 0.36, 0.07, C, sx * 0.6, -0.2, 0.2));
     return [{ part: 'head', object: group(cap, back, ...locks) }];
   },
   shortHair: () => {
     const C = '#2B2B33';
-    const cap = box(1.32, 0.24, 1.22, 0.1, C, 0, HEAD.top + 0.08, -0.02);
-    const fringe = box(1.26, 0.18, 0.14, 0.06, C, 0, HEAD.top - 0.08, HEAD.front + 0.03);
-    return [{ part: 'head', object: group(cap, fringe) }];
+    const fringe = box(1.0, 0.18, 0.16, 0.07, C, 0, HEAD.top - 0.1, HEAD.front - 0.02);
+    return [{ part: 'head', object: group(dome(C, 0.26), fringe) }];
   },
   ponytail: () => {
     const C = '#5A3A22';
-    const cap = box(1.32, 0.22, 1.22, 0.1, C, 0, HEAD.top + 0.07, -0.02);
     const tie = box(0.3, 0.2, 0.18, 0.06, '#E53935', 0, 0.3, HEAD.back - 0.1);
     const tail = box(0.34, 1.0, 0.3, 0.14, C, 0, -0.2, HEAD.back - 0.32, [0.45, 0, 0]);
-    return [{ part: 'head', object: group(cap, tie, tail) }];
+    return [{ part: 'head', object: group(dome(C, 0.24), tie, tail) }];
   },
   swoop: () => {
     const C = '#F2C14E';
-    const puff = box(1.44, 0.4, 1.32, 0.18, C, 0.04, HEAD.top + 0.14, -0.02, [0, 0, -0.06]);
-    const flap = box(1.34, 0.26, 0.46, 0.12, '#F5CD64', 0.1, HEAD.top + 0.06, HEAD.front + 0.06, [0.55, 0, -0.08]);
-    const side = box(0.2, 0.5, 0.9, 0.08, C, HEAD.side + 0.05, 0.25, -0.1);
-    return [{ part: 'head', object: group(puff, flap, side) }];
+    const puff = ball(1, C, 0.05, HEAD.top + 0.08, -0.02, [0.7, 0.36, 0.66]);
+    const flap = box(1.1, 0.26, 0.46, 0.12, '#F5CD64', 0.1, HEAD.top + 0.04, HEAD.front - 0.02, [0.55, 0, -0.08]);
+    return [{ part: 'head', object: group(puff, flap) }];
   },
   slick: () => {
     const C = '#1E1E1E';
-    const left = box(0.5, 0.16, 1.22, 0.06, C, -0.4, HEAD.top + 0.06, -0.02);
-    const right = box(0.82, 0.26, 1.24, 0.1, C, 0.22, HEAD.top + 0.1, -0.02, [0, 0, -0.04]);
-    return [{ part: 'head', object: group(left, right) }];
+    const right = ball(1, C, 0.12, HEAD.top + 0.04, -0.02, [0.55, 0.24, 0.6]);
+    return [{ part: 'head', object: group(dome(C, 0.16), right) }];
   },
-  buzz: () => [{ part: 'head', object: box(1.26, 0.14, 1.14, 0.03, '#3A3A40', 0, HEAD.top + 0.07, 0) }],
+  buzz: () => [{ part: 'head', object: dome('#3A3A40', 0.12) }],
   chickenSuit: () => {
     const Y = '#FFD23F';
-    const tail = [-0.5, 0, 0.5].map((r, i) => box(0.24, 0.7 - Math.abs(r) * 0.3, 0.12, 0.08, i === 1 ? '#FFE680' : Y, r * 0.5, TORSO.bottom + 0.25, TORSO.back - 0.15, [-0.9, 0, r]));
-    const wings = (['upperArmL', 'upperArmR'] as const).map((p, i) => ({ part: p, object: box(0.12, 0.6, 0.5, 0.05, Y, (i ? 1 : -1) * 0.3, 0, 0, [0, 0, (i ? -1 : 1) * 0.15]) }));
-    const feet = (['shoeL', 'shoeR'] as const).map((p) => ({
-      part: p,
-      object: group(...[-0.22, 0, 0.22].map((x) => box(0.14, 0.08, 0.34, 0.03, '#FB8C00', x, -0.1, 0.58, [0, x * 1.2, 0]))),
-    }));
-    return [{ part: 'torso', object: group(...tail) }, ...wings, ...feet];
+    const tail = [-0.5, 0, 0.5].map((r, i) => box(0.26, 0.8 - Math.abs(r) * 0.3, 0.14, 0.08, i === 1 ? '#FFE680' : Y, r * 0.5, TORSO.bottom + 0.3, TORSO.back - 0.18, [-0.9, 0, r]));
+    // 手臂變翅膀：外側大片羽毛，手掌換成羽毛尖
+    const wing = (sx: number) => group(box(0.14, 0.86, 0.56, 0.06, Y, sx * 0.3, -0.05, 0, [0, 0, sx * 0.12]));
+    const tips = (sx: number) => group(...[-0.14, 0, 0.14].map((z, i) => box(0.12, 0.42 - i * 0.04, 0.12, 0.05, i === 1 ? '#FFE680' : Y, sx * 0.05, -0.12, z, [z * 1.5, 0, sx * 0.1])));
+    const feet = (['shoeL', 'shoeR'] as const).map((p) => ({ part: p, object: claws('#FB8C00', 3, 0.24, -0.08, 0.6, 0.5, [Math.PI / 2, 0, 0]) }));
+    return [
+      { part: 'torso', object: group(belly('#FFE680'), ...tail) },
+      { part: 'upperArmL', object: wing(-1) }, { part: 'upperArmR', object: wing(1) },
+      { part: 'foreArmL', object: wing(-1) }, { part: 'foreArmR', object: wing(1) },
+      { part: 'handL', object: tips(-1) }, { part: 'handR', object: tips(1) },
+      ...feet,
+    ];
   },
   longDress: () => {
-    const skirt = new Mesh(geo('longSkirt', () => new CylinderGeometry(0.94, 1.3, 1.95, 24, 1, true)), cloth('#C2185B'));
-    skirt.position.y = TORSO.bottom - 0.9;
+    const skirt = new Mesh(geo('longSkirt', () => new CylinderGeometry(0.94, 1.3, 1.7, 24, 1, true)), cloth('#C2185B'));
+    skirt.position.y = TORSO.bottom - 0.82;
     skirt.castShadow = true;
     const hem = new Mesh(geo('longHem', () => new TorusGeometry(1.3, 0.05, 8, 32)), plastic('#FFC63A'));
     hem.rotation.x = Math.PI / 2;
-    hem.position.y = TORSO.bottom - 1.87;
+    hem.position.y = TORSO.bottom - 1.65;
     return [{ part: 'torso', object: group(skirt, hem) }];
   },
   shortDress: () => {
@@ -171,26 +224,59 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
     return [{ part: 'torso', object: group(skirt, hem) }];
   },
   pigBody: () => {
-    const tail = new Mesh(geo('pigTail', () => new TorusGeometry(0.16, 0.05, 8, 20, Math.PI * 1.6)), plastic('#EE8FA6'));
-    tail.position.set(0.25, TORSO.bottom + 0.35, TORSO.back - 0.12);
+    const tail = new Mesh(geo('pigTail', () => new TorusGeometry(0.18, 0.06, 8, 20, Math.PI * 1.6)), plastic('#EE8FA6'));
+    tail.position.set(0.28, TORSO.bottom + 0.4, TORSO.back - 0.14);
     tail.rotation.set(0, 0.9, 0.4);
-    return [{ part: 'torso', object: tail }];
+    // 豬蹄：手和鞋都換成深粉紅蹄子
+    const HOOF = '#9C5466';
+    const hoofHand = () => group(box(0.56, 0.3, 0.58, 0.12, HOOF, 0, -0.12, 0), box(0.04, 0.3, 0.6, 0.01, '#5A2E38', 0, -0.12, 0));
+    const hoofFoot = () => group(box(0.8, 0.32, 1.12, 0.12, HOOF, 0, 0.02, 0), box(0.04, 0.33, 0.5, 0.01, '#5A2E38', 0, 0.02, 0.32));
+    return [
+      { part: 'torso', object: group(belly('#F8C8D4'), tail) },
+      { part: 'handL', object: hoofHand() }, { part: 'handR', object: hoofHand() },
+      { part: 'shoeL', object: hoofFoot() }, { part: 'shoeR', object: hoofFoot() },
+    ];
   },
   dinoSuit: () => {
-    const G = '#6BBF59';
-    const spikes = [0.5, 0.15, -0.2, -0.55].map((y) => cone(0.16, 0.36, '#F28C28', 0, y, TORSO.back - 0.12, [-Math.PI / 2, 0, 0]));
+    const G = '#5FAE4E';
+    const ORANGE = '#F28C28';
+    const spikes = [0.55, 0.2, -0.15, -0.5].map((y) => cone(0.22, 0.5, ORANGE, 0, y, TORSO.back - 0.18, [-Math.PI / 2, 0, 0]));
+    // 粗尾巴往側後方甩出來，從正面也看得到；尾巴上也有刺
+    const seg = (w: number, x: number, y: number, z: number, ry: number) => {
+      const b = box(w, w * 0.8, w * 1.2, w * 0.3, G, x, y, z, [0.35, ry, 0]);
+      b.add(cone(w * 0.28, w * 0.6, ORANGE, 0, w * 0.5, 0, [0, 0, 0]));
+      return b;
+    };
     const tail = group(
-      box(0.7, 0.6, 0.7, 0.2, G, 0.25, TORSO.bottom + 0.1, TORSO.back - 0.3, [0.5, 0.6, 0]),
-      box(0.5, 0.44, 0.7, 0.16, G, 0.6, TORSO.bottom - 0.2, TORSO.back - 0.75, [0.7, 0.7, 0]),
-      box(0.3, 0.28, 0.6, 0.1, G, 0.95, TORSO.bottom - 0.45, TORSO.back - 1.1, [0.9, 0.8, 0]),
+      seg(0.8, 0.55, TORSO.bottom + 0.12, TORSO.back - 0.25, 0.9),
+      seg(0.62, 1.2, TORSO.bottom - 0.12, TORSO.back - 0.35, 1.2),
+      seg(0.46, 1.75, TORSO.bottom - 0.32, TORSO.back - 0.38, 1.4),
+      seg(0.3, 2.2, TORSO.bottom - 0.48, TORSO.back - 0.36, 1.5),
     );
-    return [{ part: 'torso', object: group(...spikes, tail) }];
+    const hand = () => group(box(0.54, 0.52, 0.56, 0.2, G, 0, 0, 0), claws('#FFFFFF', 3, 0.14, -0.3, 0.18, 0.2, [Math.PI * 0.85, 0, 0]));
+    const foot = () => group(box(0.8, 0.3, 1.14, 0.12, G, 0, 0.02, 0), claws('#FFFFFF', 3, 0.24, -0.02, 0.62, 0.22, [Math.PI / 2, 0, 0]));
+    return [
+      { part: 'torso', object: group(belly('#F7E27A'), ...spikes, tail) },
+      { part: 'handL', object: hand() }, { part: 'handR', object: hand() },
+      { part: 'shoeL', object: foot() }, { part: 'shoeR', object: foot() },
+    ];
   },
 };
 
 export function buildAccessory(id: AccessoryId): Attachment[] {
-  const list = BUILDERS[id]();
+  const list = BUILDERS[id]().map((a) => ({ part: a.part, object: group(a.object) }));
   for (const a of list) {
+    // 配件以設計尺寸製作，依實際部位大小縮放
+    if (a.part in DESIGN_SIZES) {
+      const p = a.part as PaintPartId;
+      const [dw, dh, dd] = DESIGN_SIZES[p];
+      const [w, h, d] = PART_DEFS[p].size;
+      if (PART_DEFS[p].shape === 'cylinder') {
+        // 圓柱頭：x、z 等比，配件才不會被拉成橢圓
+        const k = w / ((dw + dd) / 2);
+        a.object.scale.set(k, h / dh, k);
+      } else a.object.scale.set(w / dw, h / dh, d / dd);
+    }
     a.object.userData.accessory = id;
     a.object.traverse((o) => {
       o.userData.accessory = id;

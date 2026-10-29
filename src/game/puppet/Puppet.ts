@@ -1,11 +1,11 @@
-import { Group, Mesh, MeshStandardMaterial, Object3D, Vector3, type Material } from 'three';
+import { CylinderGeometry, Group, Mesh, MeshStandardMaterial, Object3D, Vector3, type Material } from 'three';
 import { GAME } from '../../config/game.config';
 import { PUPPET } from '../../config/puppet.config';
-import { plastic } from '../three/color';
-import { atlasBox, cachedRoundedBox, studGeometry } from '../three/geometry';
+import { plastic, plasticUnique, srgb } from '../three/color';
+import { atlasBox, cachedRoundedBox, roundedCylinderAtlas, studGeometry } from '../three/geometry';
 import { DecalLayer } from './decals';
 import type { PaintStore } from './paintSurface';
-import { PART_DEFS, type FixedPartId, type PaintPartId } from './parts';
+import { PART_DEFS, SKELETON as SK, type FixedPartId, type PaintPartId } from './parts';
 import { Scatter } from './scatter';
 import { buildAccessory, type AccessorySlot } from './looks/accessories';
 import { DelayBuffer, spring0, stepSpring, type Spring } from './spring';
@@ -62,6 +62,8 @@ export class Puppet {
   private aiPose: AiPose = 'idle';
   private aiSide: -1 | 1 = -1;
   private accObjects: Object3D[] = [];
+  private neckMesh!: Mesh;
+  private offPaint: () => void = () => {};
   private offAcc: () => void;
   private readonly shadows: boolean;
 
@@ -75,7 +77,7 @@ export class Puppet {
     this.spinPivot.add(off);
     off.add(this.squashG);
     const pelvis = new Group();
-    pelvis.position.y = 2.15;
+    pelvis.position.y = SK.pelvisY;
     this.squashG.add(pelvis);
     const studMat = plastic(PUPPET.baseColor);
 
@@ -83,7 +85,8 @@ export class Puppet {
       const def = PART_DEFS[name];
       const [w, h, d] = def.size;
       const mat = new MeshStandardMaterial({ map: paint.surfaces[name].texture, roughness: 0.32, metalness: 0 });
-      const m = new Mesh(atlasBox(w, h, d, def.radius), mat);
+      const geo = def.shape === 'cylinder' ? roundedCylinderAtlas(w / 2, h, def.radius) : atlasBox(w, h, d, def.radius);
+      const m = new Mesh(geo, mat);
       m.position.y = y;
       m.castShadow = shadows;
       m.receiveShadow = shadows;
@@ -119,19 +122,23 @@ export class Puppet {
     };
 
     const torsoJ = joint('torso', pelvis, 0, 0);
-    part('torso', torsoJ, 0.75);
-    const neck = joint('neck', torsoJ, 0, 1.47);
-    part('head', neck, 0.53);
+    part('torso', torsoJ, SK.torsoY);
+    const neck = joint('neck', torsoJ, 0, SK.neckJointY);
+    // 短脖子（固定零件，顏色跟著頭底部）
+    this.neckMesh = fixedMesh('neck', new Mesh(new CylinderGeometry(SK.neck.radius, SK.neck.radius * 1.08, SK.neck.height, 20), plasticUnique(PUPPET.baseColor)));
+    this.neckMesh.position.y = SK.neck.y;
+    neck.add(this.neckMesh);
+    part('head', neck, SK.headY);
     for (const s of ['L', 'R'] as const) {
-      const sx = s === 'L' ? -1.13 : 1.13;
-      const sh = joint('sh' + s, torsoJ, sx, 1.32);
-      part(s === 'L' ? 'upperArmL' : 'upperArmR', sh, -0.4);
-      const el = joint('el' + s, sh, 0, -0.82);
-      part(s === 'L' ? 'foreArmL' : 'foreArmR', el, -0.375);
+      const sx = s === 'L' ? -SK.shoulder.x : SK.shoulder.x;
+      const sh = joint('sh' + s, torsoJ, sx, SK.shoulder.y);
+      part(s === 'L' ? 'upperArmL' : 'upperArmR', sh, SK.upperArmY);
+      const el = joint('el' + s, sh, 0, SK.elbowY);
+      part(s === 'L' ? 'foreArmL' : 'foreArmR', el, SK.foreArmY);
       // 連指手套形的手（含拇指）
       const skin = plastic(PUPPET.handColor);
       const hand = fixedMesh(s === 'L' ? 'handL' : 'handR', new Mesh(cachedRoundedBox(0.5, 0.48, 0.52, 0.2), skin));
-      hand.position.y = -0.98;
+      hand.position.y = SK.handY;
       const thumb = new Mesh(cachedRoundedBox(0.16, 0.26, 0.2, 0.07), skin);
       thumb.position.set(s === 'L' ? 0.27 : -0.27, 0.06, 0.08);
       thumb.rotation.z = s === 'L' ? -0.35 : 0.35;
@@ -140,18 +147,20 @@ export class Puppet {
       el.add(hand);
     }
     for (const s of ['L', 'R'] as const) {
-      const hx = s === 'L' ? -0.43 : 0.43;
+      const hx = s === 'L' ? -SK.hipX : SK.hipX;
       const hip = joint('hip' + s, pelvis, hx, 0);
-      part(s === 'L' ? 'thighL' : 'thighR', hip, -0.475);
-      const kn = joint('kn' + s, hip, 0, -0.97);
-      part(s === 'L' ? 'shinL' : 'shinR', kn, -0.475);
+      part(s === 'L' ? 'thighL' : 'thighR', hip, SK.thighY);
+      const kn = joint('kn' + s, hip, 0, SK.kneeY);
+      part(s === 'L' ? 'shinL' : 'shinR', kn, SK.shinY);
       // 圓角鞋
       const shoe = fixedMesh(s === 'L' ? 'shoeL' : 'shoeR', new Mesh(cachedRoundedBox(0.74, 0.28, 1.08, 0.12), plastic(PUPPET.shoeColor)));
-      shoe.position.set(0, -1.07, 0.15);
+      shoe.position.set(0, SK.shoe.y, SK.shoe.z);
       kn.add(shoe);
     }
     this.syncAccessories(paint);
     this.offAcc = paint.onAccessories(() => this.syncAccessories(paint));
+    this.syncNeck(paint);
+    this.offPaint = paint.onChange(() => this.syncNeck(paint));
   }
 
   /** 依目前選的範例重建 3D 配件（掛在部位 mesh 底下，會跟著噴飛）。 */
@@ -173,8 +182,15 @@ export class Puppet {
     }
   }
 
+  /** 脖子取頭部底面的顏色，看起來和頭是同一塊 */
+  private syncNeck(paint: PaintStore) {
+    const hex = paint.sampleColor('head', 3);
+    (this.neckMesh.material as MeshStandardMaterial).color.copy(srgb(hex));
+  }
+
+  /** 目前戴著幾種 3D 配件（一種配件可能由好幾塊組成） */
   get accessoryCount() {
-    return this.accObjects.length;
+    return new Set(this.accObjects.map((o) => o.userData.accessory)).size;
   }
 
   /** 加入場景（噴飛時零件掛到這個物件下）。 */
@@ -488,6 +504,7 @@ export class Puppet {
 
   dispose() {
     this.offAcc();
+    this.offPaint();
     this.accObjects.forEach((o) => o.removeFromParent());
     this.forceReassemble();
     this.decals.clear();

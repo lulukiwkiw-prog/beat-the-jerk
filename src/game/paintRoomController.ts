@@ -3,9 +3,9 @@ import { PAINT } from '../config/paint.config';
 import { PUPPET } from '../config/puppet.config';
 import { prefersReducedMotion } from '../state/settings';
 import { layoutBubble } from '../ui/bubble';
-import { faceFromUV, uvToFacePoint, type Face, type FacePoint } from './puppet/faces';
+import { faceFromUV, uvToFacePointDims, type Face, type FacePoint } from './puppet/faces';
 import type { BrushSpec, PaintStore } from './puppet/paintSurface';
-import { PART_DEFS, type PaintPartId } from './puppet/parts';
+import { PART_DEFS, partFaceDims, type PaintPartId } from './puppet/parts';
 import { Puppet } from './puppet/Puppet';
 import { buildPaintRoom, PAINT_ROOM_BACKGROUND } from './three/paintRoom';
 import { projectToScreen } from './three/project';
@@ -184,7 +184,7 @@ export class PaintRoomController {
       /* 測試環境可能不支援 */
     }
     this.paint.beginStroke(h.part, h.face);
-    const p = uvToFacePoint(h.u, h.v, h.face, PART_DEFS[h.part].size);
+    const p = uvToFacePointDims(h.u, h.v, h.face, partFaceDims(h.part, h.face));
     this.stroke = { pointerId: e.pointerId, part: h.part, face: h.face, last: p };
     this.paint.segment(h.part, h.face, p, p, this.brush);
     this.ev.onStatus(`正在畫：${PART_DEFS[h.part].label}`);
@@ -199,7 +199,7 @@ export class PaintRoomController {
       s.last = null;
       return;
     }
-    const p = uvToFacePoint(h.u, h.v, h.face, PART_DEFS[h.part].size);
+    const p = uvToFacePointDims(h.u, h.v, h.face, partFaceDims(h.part, h.face));
     this.paint.segment(h.part, h.face, s.last ?? p, p, this.brush);
     s.last = p;
   };
@@ -214,7 +214,12 @@ export class PaintRoomController {
     m.updateWorldMatrix(true, false);
     const [w, h, d] = PART_DEFS[part].size;
     const local = new Vector3();
-    if (face === 4) local.set((a - 0.5) * w, (0.5 - b) * h, d / 2);
+    if (PART_DEFS[part].shape === 'cylinder' && face !== 2 && face !== 3) {
+      const start = { 4: -0.25, 0: 0.25, 5: 0.75, 1: 1.25 }[face] * Math.PI;
+      const th = start + a * (Math.PI / 2);
+      const R = w / 2;
+      local.set(R * Math.sin(th), (0.5 - b) * h, R * Math.cos(th));
+    } else if (face === 4) local.set((a - 0.5) * w, (0.5 - b) * h, d / 2);
     else if (face === 5) local.set((0.5 - a) * w, (0.5 - b) * h, -d / 2);
     else if (face === 0) local.set(w / 2, (0.5 - b) * h, (0.5 - a) * d);
     else if (face === 1) local.set(-w / 2, (0.5 - b) * h, (a - 0.5) * d);
