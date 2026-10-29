@@ -1,0 +1,916 @@
+<title>打爆那個爛人！積木版</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chiron+GoRound+TC:wght@500;700;900&family=Bungee&display=swap">
+<style>
+/* 單一視覺世界：積木玩具擂台。天藍底、番茄紅主色、向日葵黃點綴、深靛墨色 */
+:root{
+  --sky:#EEECE5;
+  --ink:#22264A;
+  --muted:#5E648F;
+  --card:#FFFFFF;
+  --line:#C9D2F2;
+  --tomato:#E8392B;
+  --sun:#FFC63A;
+  --font-ui:"Chiron GoRound TC","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  --font-num:"Bungee","Chiron GoRound TC",system-ui,sans-serif;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+html,body{background:var(--sky);color:var(--ink)}
+body{font-family:var(--font-ui);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 28px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 16px}
+h1{margin:0;font-size:clamp(24px,6vw,34px);font-weight:900;letter-spacing:.02em;line-height:1.15;text-wrap:balance}
+h1 em{font-style:normal;color:var(--tomato)}
+.sub{margin:2px 0 0;color:var(--muted);font-size:14px}
+.badge{font-size:12px;font-weight:700;letter-spacing:.06em;background:var(--ink);color:var(--sun);padding:4px 10px;border-radius:999px;white-space:nowrap}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--card);border:2px solid var(--ink);border-radius:14px;padding:5px}
+.tab{font:inherit;font-weight:900;font-size:16px;border:0;border-radius:10px;padding:10px 8px;background:transparent;color:var(--ink);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--tomato);color:#fff}
+.tab:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+
+.model{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:720px){.model{grid-template-columns:1fr}}
+.paintbox{background:var(--card);border:2px solid var(--ink);border-radius:16px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+#paintCv{width:100%;max-width:min(100%,calc(60vh*400/460));aspect-ratio:400/460;margin:0 auto;display:block;touch-action:none;cursor:crosshair;border-radius:10px}
+.turn{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.partname{text-align:center;font-weight:700;color:var(--muted);font-size:13px;min-height:1.5em}
+.tools{display:flex;flex-direction:column;gap:14px;min-width:0}
+.group{display:flex;flex-direction:column;gap:6px}
+.label{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+.palette{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.sw{aspect-ratio:1;border-radius:8px;border:2px solid rgba(34,38,74,.25);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--sun)}
+.row{display:flex;flex-wrap:wrap;gap:6px}
+.btn{font:inherit;font-weight:700;font-size:14px;border:2px solid var(--ink);background:var(--card);color:var(--ink);border-radius:10px;padding:7px 12px;cursor:pointer;min-height:40px}
+.btn[aria-pressed="true"]{background:var(--ink);color:#fff}
+.btn.primary{background:var(--tomato);color:#fff;border-color:var(--tomato)}
+.btn.warn{border-color:var(--tomato);color:var(--tomato)}
+.btn:disabled{opacity:.4;cursor:default}
+.dot{display:inline-block;border-radius:50%;background:currentColor;vertical-align:middle}
+.field{display:flex;flex-direction:column;gap:4px}
+.field input{font:inherit;font-size:15px;border:2px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);width:100%;box-sizing:border-box}
+.count{font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted);margin:0}
+.confirm{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--tomato)}
+
+.duel{display:flex;flex-direction:column;gap:10px}
+.stage{position:relative;border:2px solid var(--ink);border-radius:16px;overflow:hidden;background:#E8E7DE}
+#duelCv{width:100%;aspect-ratio:800/500;display:block;touch-action:none}
+@media (max-width:700px){#duelCv{aspect-ratio:4/3.3}}
+.hud{position:absolute;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 10px;pointer-events:none;z-index:3}
+.chip{background:rgba(255,255,255,.92);color:var(--ink);border-radius:10px;padding:3px 9px;font-size:12px;font-weight:700;line-height:1.3;display:flex;flex-direction:column;align-items:center}
+.chip b{font-family:var(--font-num);font-weight:400;font-size:18px;font-variant-numeric:tabular-nums;line-height:1.1}
+.hudl,.hudr{display:flex;gap:6px}
+.hudr{pointer-events:auto}
+.icon{font:inherit;font-weight:900;border:0;border-radius:10px;background:rgba(255,255,255,.92);color:var(--ink);min-width:40px;min-height:40px;cursor:pointer;font-size:14px}
+.fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.word{position:absolute;transform:translate(-50%,-50%);font-weight:900;white-space:nowrap;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:0 3px 0 var(--ink)}
+#bubble{position:absolute;width:max-content;max-width:62%;background:#fff;color:var(--ink);border:2.5px solid var(--ink);border-radius:16px;padding:6px 12px;font-weight:900;font-size:clamp(13px,2.6vw,18px);line-height:1.35;pointer-events:none;transform:translate(0,-50%);overflow-wrap:anywhere;text-align:center;white-space:pre-wrap;z-index:2}
+#bubble::after{content:"";position:absolute;top:50%;left:-10px;width:14px;height:14px;background:#fff;border-left:2.5px solid var(--ink);border-bottom:2.5px solid var(--ink);transform:translateY(-50%) rotate(45deg)}
+#bubble.toleft::after{left:auto;right:-10px;border-left:0;border-bottom:0;border-right:2.5px solid var(--ink);border-top:2.5px solid var(--ink)}
+#bubble.shake{animation:shake .18s}
+@keyframes shake{25%{margin-left:-4px}75%{margin-left:4px}}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(34,38,74,.62);color:#fff;text-align:center;padding:16px;z-index:4}
+.overlay h2{margin:0;font-size:clamp(22px,5vw,32px);font-weight:900}
+.overlay p{margin:0;font-size:14px;opacity:.9;max-width:36ch}
+.overlay .row{justify-content:center}
+.stats{font-family:var(--font-num);font-size:clamp(18px,4vw,24px);display:flex;gap:18px;justify-content:center}
+.stats span{display:flex;flex-direction:column;align-items:center}
+.stats small{font-family:var(--font-ui);font-size:12px;opacity:.8}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700;font-size:14px;text-align:center;padding:16px}
+
+.pad{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:end}
+@media (max-width:420px){.pad{grid-template-columns:1fr}}
+.dpad{display:grid;grid-template-columns:repeat(3,64px);gap:8px}
+.ctl{font:inherit;font-weight:900;font-size:16px;border:2px solid var(--ink);background:var(--card);color:var(--ink);border-radius:14px;height:64px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;position:relative;overflow:hidden}
+.ctl.on{background:var(--ink);color:#fff}
+.attacks{display:flex;flex-direction:column;gap:8px;min-width:0}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mode{font:inherit;font-weight:900;border:2px solid var(--ink);border-radius:10px;background:var(--card);color:var(--ink);min-height:40px;cursor:pointer}
+.mode[aria-pressed="true"]{background:var(--sun)}
+.moves{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mv{background:var(--tomato);color:#fff;border-color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;font-size:15px}
+.mv small{font-size:11px;opacity:.85;font-family:var(--font-num);font-weight:400}
+.mv .cd{position:absolute;inset:0;background:rgba(34,38,74,.72);transform-origin:left;transform:scaleX(var(--cd,0));pointer-events:none}
+.mv .cdt{position:absolute;right:6px;top:4px;font-family:var(--font-num);font-size:11px;font-weight:400}
+.keys{font-size:12px;color:var(--muted);margin:0}
+kbd{font-family:var(--font-num);font-size:11px;border:1.5px solid var(--line);border-radius:5px;padding:0 5px;background:#fff}
+@media (prefers-reduced-motion:reduce){#bubble.shake{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>打爆<em>那個爛人</em>！</h1>
+      <p class="sub">把沒說出口的話，打成滿天星星。</p>
+    </div>
+    <span class="badge">3D 積木版預覽</span>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tabModel" role="tab" aria-selected="true" aria-controls="secModel">① 積木彩繪室</button>
+    <button class="tab" id="tabDuel" role="tab" aria-selected="false" aria-controls="secDuel">② 決鬥畫面</button>
+  </div>
+
+  <section id="secModel" class="model" role="tabpanel" aria-labelledby="tabModel">
+    <div class="paintbox">
+      <div style="position:relative">
+        <canvas id="paintCv" aria-label="積木木偶彩繪畫布：直接在 3D 積木表面畫"></canvas>
+        <div class="loading" id="loadP">正在堆積木……</div>
+      </div>
+      <div class="turn">
+        <button class="btn" data-turn="-1">↶ 向左轉</button>
+        <button class="btn" data-turn="0">正面</button>
+        <button class="btn" data-turn="1">向右轉 ↷</button>
+      </div>
+      <div class="partname" id="partName">直接在積木上畫；每一筆只會留在起筆的那一面</div>
+    </div>
+    <div class="tools">
+      <div class="group">
+        <span class="label">顏色</span>
+        <div class="palette" id="palette"></div>
+      </div>
+      <div class="group">
+        <span class="label">筆刷</span>
+        <div class="row" id="sizes"></div>
+      </div>
+      <div class="group">
+        <span class="label">編輯</span>
+        <div class="row">
+          <button class="btn" id="undo">復原</button>
+          <button class="btn" id="redo">重做</button>
+          <button class="btn" id="sample">畫上範例</button>
+          <button class="btn warn" id="clear">清空彩繪</button>
+        </div>
+        <div class="confirm" id="clearConfirm" hidden>
+          確定清空全部彩繪？
+          <button class="btn warn" id="clearYes">清空</button>
+          <button class="btn" id="clearNo">取消</button>
+        </div>
+      </div>
+      <div class="group">
+        <span class="label">試試看：彩繪會跟著積木一起動</span>
+        <div class="row">
+          <button class="btn" data-act="wave">揮手</button>
+          <button class="btn" data-act="hit">被打一拳</button>
+          <button class="btn" data-act="slap">甩巴掌</button>
+          <button class="btn" data-act="boom">噴飛再組回</button>
+        </div>
+      </div>
+      <div class="group field">
+        <label class="label" for="dLine">D．被打時他會說（測試用，可留空）</label>
+        <input id="dLine" maxlength="80" placeholder="不是你的錯" autocomplete="off">
+        <span class="count" id="dCount">0／80</span>
+      </div>
+      <button class="btn primary" id="goDuel">就是你！出來決鬥！</button>
+      <p class="note">積木人是原創造型。預覽版沒有放大部位、配件與存檔；轉向按鈕可以畫側面和背面。</p>
+    </div>
+  </section>
+
+  <section id="secDuel" class="duel" role="tabpanel" aria-labelledby="tabDuel" hidden>
+    <div class="stage" id="stage">
+      <canvas id="duelCv" aria-label="積木決鬥擂台"></canvas>
+      <div class="fx" id="fx"></div>
+      <div class="hud">
+        <div class="hudl">
+          <div class="chip">時間<b id="hTime">1:00</b></div>
+          <div class="chip">分數<b id="hScore">0</b></div>
+          <div class="chip">連擊<b id="hCombo">0</b></div>
+          <div class="chip">最高<b id="hMax">0</b></div>
+        </div>
+        <div class="hudr"><button class="icon" id="pauseBtn" aria-label="暫停">❚❚</button></div>
+      </div>
+      <div id="bubble" hidden></div>
+      <div class="overlay" id="ovStart">
+        <h2>準備開打</h2>
+        <p>預覽版：簡單模式、4 招、1 分鐘。上勾拳把他打上天，落地會散成一地積木再自己組回來。頭上出現「！」就閃開。</p>
+        <div class="row"><button class="btn primary" id="startBtn">開始決鬥</button></div>
+      </div>
+      <div class="overlay" id="ovPause" hidden>
+        <h2>暫停中</h2>
+        <div class="row">
+          <button class="btn primary" id="resumeBtn">繼續</button>
+          <button class="btn" id="quitBtn">結束這回合</button>
+        </div>
+      </div>
+      <div class="overlay" id="ovEnd" hidden>
+        <h2>時間到！</h2>
+        <div class="stats">
+          <span id="eScore">0<small>分數</small></span>
+          <span id="eMax">0<small>最高連擊</small></span>
+        </div>
+        <p>正式版會從這裡進入道歉與結尾。</p>
+        <div class="row">
+          <button class="btn primary" id="againBtn">再打一次</button>
+          <button class="btn" id="backBtn">回去改木偶</button>
+        </div>
+      </div>
+    </div>
+    <div class="pad">
+      <div class="dpad">
+        <button class="ctl" id="kLeft" aria-label="往左">◀</button>
+        <button class="ctl" id="kDodge" aria-label="閃避">閃避</button>
+        <button class="ctl" id="kRight" aria-label="往右">▶</button>
+      </div>
+      <div class="attacks">
+        <div class="modes">
+          <button class="mode" id="mHand" aria-pressed="true">徒手</button>
+          <button class="mode" id="mWeapon" aria-pressed="false">武器</button>
+        </div>
+        <div class="moves" id="moves"></div>
+      </div>
+    </div>
+    <p class="keys">電腦：<kbd>A</kbd><kbd>D</kbd> 或方向鍵移動、<kbd>1</kbd>～<kbd>3</kbd> 出招、<kbd>Q</kbd> 切換徒手／武器、<kbd>空白</kbd> 閃避、<kbd>Esc</kbd> 暫停</p>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+if(!window.THREE){$("loadP").textContent="3D 引擎載入失敗，請重新整理頁面。";return;}
+$("loadP").hidden=true;
+const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const PR=()=>Math.min(window.devicePixelRatio||1,2);
+const V3=THREE.Vector3;
+
+/* ========== 共用：積木零件 ========== */
+const BASE="#E7E1D2";
+const studGeo=new THREE.CylinderGeometry(.13,.13,.11,18);
+const SEG=10;
+function roundGeo(w,h,d,r){
+  // 圓角方塊：把方塊格點往邊緣集中，再推到圓角上，做出塑膠玩具的圓潤邊
+  r=Math.min(r,w/2-.01,h/2-.01,d/2-.01);
+  const g=new THREE.BoxGeometry(w,h,d,SEG,SEG,SEG),pos=g.attributes.position,nor=g.attributes.normal;
+  const warp=(x,a)=>{const t=Math.abs(x)/a,hi=a-r;return Math.sign(x)*(t<=.4?hi*t/.4:hi+r*(t-.4)/.6);};
+  const p=new V3(),c=new V3(),n=new V3(),hw=w/2-r,hh=h/2-r,hd=d/2-r,cl=(v,m)=>Math.max(-m,Math.min(m,v));
+  for(let i=0;i<pos.count;i++){
+    p.set(warp(pos.getX(i),w/2),warp(pos.getY(i),h/2),warp(pos.getZ(i),d/2));
+    c.set(cl(p.x,hw),cl(p.y,hh),cl(p.z,hd));n.subVectors(p,c);
+    if(n.lengthSq()<1e-10)n.fromBufferAttribute(nor,i);else n.normalize();
+    p.copy(c).addScaledVector(n,r);pos.setXYZ(i,p.x,p.y,p.z);nor.setXYZ(i,n.x,n.y,n.z);
+  }
+  pos.needsUpdate=true;nor.needsUpdate=true;return g;
+}
+function atlasBox(w,h,d,r){
+  // 每一面對應貼圖上的一格（3×2），彩繪只會留在那一面
+  const g=roundGeo(w,h,d,r==null?.13:r),uv=g.attributes.uv,per=(SEG+1)*(SEG+1);
+  for(let f=0;f<6;f++){const col=f%3,row=Math.floor(f/3);
+    for(let i=0;i<per;i++){const k=f*per+i;uv.setXY(k,(col+uv.getX(k))/3,(row+uv.getY(k))/2);}}
+  uv.needsUpdate=true;return g;
+}
+function rbox(w,h,d,r,mat){const m=new THREE.Mesh(roundGeo(w,h,d,r),mat);m.castShadow=true;m.receiveShadow=true;return m;}
+function studRow(mesh,n,h,mat){for(let i=0;i<n;i++){const s=new THREE.Mesh(studGeo,mat);s.position.set((i-(n-1)/2)*.42,h/2+.05,0);s.castShadow=true;mesh.add(s);}}
+function addStuds(mesh,w,h,d,mat){
+  const nx=Math.max(1,Math.floor(w/.42)),nz=Math.max(1,Math.floor(d/.42));
+  for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){
+    const s=new THREE.Mesh(studGeo,mat);
+    s.position.set((i-(nx-1)/2)*.4,h/2+.055,(j-(nz-1)/2)*.4);s.castShadow=true;mesh.add(s);
+  }
+}
+const lin=c=>new THREE.Color(c).convertSRGBToLinear();
+function plastic(color){return new THREE.MeshStandardMaterial({color:lin(color),roughness:.3,metalness:0});}
+
+/* ---------- 可彩繪部位：每個部位一張 3×2 格貼圖 ---------- */
+const CELL=128;
+const PAINT_PARTS={
+  head:{label:"頭",size:[1.22,1.1,1.1]},
+  torso:{label:"軀幹",size:[1.7,1.5,1.0]},
+  uarmL:{label:"左上臂",size:[.5,.8,.55]},uarmR:{label:"右上臂",size:[.5,.8,.55]},
+  farmL:{label:"左前臂",size:[.46,.75,.5]},farmR:{label:"右前臂",size:[.46,.75,.5]},
+  thighL:{label:"左大腿",size:[.72,.95,.8]},thighR:{label:"右大腿",size:[.72,.95,.8]},
+  shinL:{label:"左小腿",size:[.68,.95,.76]},shinR:{label:"右小腿",size:[.68,.95,.76]},
+};
+for(const k in PAINT_PARTS){
+  const P=PAINT_PARTS[k];
+  P.canvas=document.createElement("canvas");P.canvas.width=CELL*3;P.canvas.height=CELL*2;
+  P.ctx=P.canvas.getContext("2d");P.ctx.fillStyle=BASE;P.ctx.fillRect(0,0,CELL*3,CELL*2);
+  P.tex=new THREE.CanvasTexture(P.canvas);P.tex.anisotropy=4;
+  if("encoding" in P.tex)P.tex.encoding=THREE.sRGBEncoding;
+}
+function faceDims(name,f){const [w,h,d]=PAINT_PARTS[name].size;return f<2?[d,h]:f<4?[w,d]:[w,h];}
+function cellRect(f){return {x:(f%3)*CELL,y:(1-Math.floor(f/3))*CELL};}
+// 在某部位某一面以「該面的實際尺寸」作畫（單位：積木單位），原點在該面左上
+function onFace(name,f,fn){
+  const P=PAINT_PARTS[name],c=P.ctx,r=cellRect(f),[fw,fh]=faceDims(name,f);
+  c.save();c.beginPath();c.rect(r.x,r.y,CELL,CELL);c.clip();
+  c.translate(r.x,r.y);c.scale(CELL/fw,CELL/fh);fn(c,fw,fh);c.restore();
+}
+function refresh(name){PAINT_PARTS[name].tex.needsUpdate=true;}
+
+/* ---------- 掌印、鞋印貼片 ---------- */
+function decalTex(draw){const c=document.createElement("canvas");c.width=c.height=128;draw(c.getContext("2d"));const t=new THREE.CanvasTexture(c);if("encoding" in t)t.encoding=THREE.sRGBEncoding;return t;}
+const palmTex=decalTex(x=>{x.fillStyle="#E8546A";x.beginPath();x.ellipse(64,76,30,34,0,0,7);x.fill();
+  for(let i=0;i<4;i++){x.beginPath();x.ellipse(36+i*18,30,8,22,(-1.5+i)*.12,0,7);x.fill();}x.beginPath();x.ellipse(100,70,8,20,-.9,0,7);x.fill();});
+const shoeTex=decalTex(x=>{x.fillStyle="#4A3A2A";x.beginPath();x.ellipse(64,44,26,34,0,0,7);x.fill();x.beginPath();x.ellipse(64,100,19,22,0,0,7);x.fill();
+  x.fillStyle="rgba(255,255,255,.55)";for(let i=0;i<5;i++)x.fillRect(42,22+i*10,44,3);});
+
+/* ========== 積木人（木偶） ========== */
+function buildPuppet(scene){
+  const P={meshes:{},fly:[],j:{},decals:[]};
+  const root=new THREE.Group();scene.add(root);
+  const spinG=new THREE.Group();spinG.position.y=2.4;root.add(spinG);
+  const off=new THREE.Group();off.position.y=-2.4;spinG.add(off);
+  const squash=new THREE.Group();off.add(squash);
+  const pelvis=new THREE.Group();pelvis.position.y=2.15;squash.add(pelvis);
+  const studMat=plastic(BASE);
+  const part=(name,parent,y)=>{
+    const S=PAINT_PARTS[name].size,m=new THREE.Mesh(atlasBox(S[0],S[1],S[2],name==="head"?.24:name==="torso"?.16:.12),plastic("#ffffff"));
+    m.material.map=PAINT_PARTS[name].tex;m.position.y=y;m.castShadow=true;m.receiveShadow=true;
+    m.userData.part=name;if(name==="head")studRow(m,2,S[1],studMat);parent.add(m);P.meshes[name]=m;P.fly.push(m);return m;
+  };
+  const joint=(name,parent,x,y)=>{const g=new THREE.Group();g.position.set(x,y,0);parent.add(g);P.j[name]=g;return g;};
+  // 軀幹與頭
+  const torsoJ=joint("torso",pelvis,0,0);part("torso",torsoJ,.75);
+  const neck=joint("head",torsoJ,0,1.55);part("head",neck,.6);
+  // 手臂
+  for(const s of ["L","R"]){
+    const sx=s==="L"?-1.13:1.13;
+    const sh=joint("sh"+s,torsoJ,sx,1.32);part("uarm"+s,sh,-.4);
+    const el=joint("el"+s,sh,0,-.82);part("farm"+s,el,-.375);
+    const skin=plastic("#F2D29B"),hand=rbox(.5,.48,.52,.2,skin);hand.position.y=-.98;
+    const thumb=rbox(.16,.26,.2,.07,skin);thumb.position.set(s==="L"?.27:-.27,.06,.08);thumb.rotation.z=s==="L"?-.35:.35;hand.add(thumb);
+    el.add(hand);P.fly.push(hand);
+  }
+  // 腿
+  for(const s of ["L","R"]){
+    const hx=s==="L"?-.43:.43;
+    const hip=joint("hip"+s,pelvis,hx,0);part("thigh"+s,hip,-.475);
+    const kn=joint("kn"+s,hip,0,-.97);part("shin"+s,kn,-.475);
+    const foot=rbox(.74,.28,1.08,.12,plastic("#2B2B33"));foot.position.set(0,-1.07,.15);kn.add(foot);P.fly.push(foot);
+  }
+  Object.assign(P,{root,spinG,squash,scene,x:0,lift:0,vx:0,vy:0,air:false,spin:0,spinV:0,sx:1,sy:1,sxV:0,syV:0,
+    a:{torso:0,headZ:0,headY:0,shL:-.12,elL:-.05,shR:.12,elR:.05,hipL:-.04,hipR:.04},
+    av:{torso:0,headZ:0,headY:0,shL:0,elL:0,shR:0,elR:0,hipL:0,hipR:0},
+    wave:0,act:null,actT:0,ai:{phase:"idle",t:6,side:-1},boom:null});
+  return P;
+}
+function spring(o,ov,key,target,k,d,dt){ov[key]+=((target-o[key])*k-ov[key]*d)*dt;o[key]+=ov[key]*dt;}
+function puppetTargets(P,t){
+  const T={torso:Math.sin(t*1.6)*.03,headZ:Math.sin(t*1.3+1)*.05,headY:Math.sin(t*.9)*.12,shL:-.12,elL:-.05,shR:.12,elR:.05,hipL:-.04,hipR:.04};
+  const lag=Math.max(-.8,Math.min(.8,P.vx*.05));
+  T.shL+=lag;T.shR+=lag;T.elL+=lag*.5;T.elR+=lag*.5;
+  if(P.air){T.shL=-2.2;T.shR=2.2;T.elL=-.4;T.elR=.4;T.hipL=-.45;T.hipR=.45;}
+  if(P.act==="wave"){T.shR=2.7+Math.sin(P.actT*14)*.3;T.elR=.5+Math.sin(P.actT*14)*.5;T.headZ=-.12;}
+  const ai=P.ai,s=ai.side<0?"L":"R",k=ai.side<0?1:-1;
+  if(ai.phase==="windup"){T["sh"+s]=.5*k;T["el"+s]=1.6*k;T.torso=-.14*k;T.headZ=-.08*k;}
+  if(ai.phase==="punch"){T["sh"+s]=-1.6*k;T["el"+s]=0;T.torso=.16*k;}
+  return T;
+}
+function poke(P,kind,dir){
+  if(kind==="wave"){P.act="wave";P.actT=0;}
+  if(kind==="hit"){P.av.headZ+=dir*-(10+Math.random()*5);P.av.torso-=dir*4;P.sxV+=5;P.syV-=4;P.av.shL+=dir*-5;P.av.shR+=dir*-5;}
+  if(kind==="slap"){P.av.headY+=dir*28;P.av.headZ-=dir*6;P.wave=.35;addDecal(P,"head",palmTex,.6,.7);}
+}
+function addDecal(P,part,tex,w,h){
+  const S=PAINT_PARTS[part].size,m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
+  m.position.set((Math.random()-.5)*S[0]*.45,(Math.random()-.5)*S[1]*.35,S[2]/2+.01);m.rotation.z=(Math.random()-.5)*.6;
+  P.meshes[part].add(m);P.decals.push({m,life:part==="head"?2:3});
+}
+
+/* ---- 積木噴飛再自動組回去 ---- */
+function boom(P,strength){
+  if(P.boom)return;
+  P.root.updateMatrixWorld(true);
+  const c=new V3();P.spinG.getWorldPosition(c);
+  const items=P.fly.map(m=>{
+    const it={m,parent:m.parent,lp:m.position.clone(),lq:m.quaternion.clone(),ls:m.scale.clone()};
+    P.scene.attach(m);
+    const dir=m.getWorldPosition(new V3()).sub(c);dir.z+=.6;dir.normalize();
+    it.v=dir.multiplyScalar(4+Math.random()*4*strength).add(new V3((Math.random()-.5)*2,5+Math.random()*3*strength,(Math.random()-.2)*2.5));
+    it.w=new V3((Math.random()-.5)*14,(Math.random()-.5)*14,(Math.random()-.5)*14);
+    return it;
+  });
+  P.boom={t:0,items,fly:1.15,ret:.65};
+}
+const _m=new THREE.Matrix4(),_p=new V3(),_q=new THREE.Quaternion(),_s=new V3(),_e=new THREE.Euler(),_dq=new THREE.Quaternion();
+function updateBoom(P,dt){
+  const B=P.boom;if(!B)return;B.t+=dt;
+  if(B.t<B.fly){
+    for(const it of B.items){
+      const m=it.m;it.v.y-=18*dt;m.position.addScaledVector(it.v,dt);
+      _e.set(it.w.x*dt,it.w.y*dt,it.w.z*dt);_dq.setFromEuler(_e);m.quaternion.premultiply(_dq);
+      if(m.position.y<.22){m.position.y=.22;it.v.y=Math.abs(it.v.y)*.42;it.v.x*=.6;it.v.z*=.6;it.w.multiplyScalar(.6);}
+      m.position.z=Math.max(-2.5,Math.min(3,m.position.z));
+    }
+  }else if(B.t<B.fly+B.ret){
+    const k=(B.t-B.fly)/B.ret,e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    P.root.updateMatrixWorld(true);
+    for(const it of B.items){
+      if(!it.sp){it.sp=it.m.position.clone();it.sq=it.m.quaternion.clone();}
+      _m.compose(it.lp,it.lq,it.ls).premultiply(it.parent.matrixWorld).decompose(_p,_q,_s);
+      it.m.position.lerpVectors(it.sp,_p,e);it.m.quaternion.copy(it.sq).slerp(_q,e);it.m.scale.copy(_s);
+    }
+  }else{
+    for(const it of B.items){it.parent.attach(it.m);it.m.position.copy(it.lp);it.m.quaternion.copy(it.lq);it.m.scale.copy(it.ls);}
+    P.boom=null;P.sxV-=4;P.syV+=6;
+  }
+}
+
+function updatePuppet(P,dt,t,stage){
+  if(P.act){P.actT+=dt;if(P.actT>1.3)P.act=null;}
+  if(P.wave>0)P.wave=Math.max(0,P.wave-dt);
+  for(const d of P.decals){d.life-=dt;d.m.material.opacity=Math.min(1,d.life/.4);if(d.life<=0){d.m.parent.remove(d.m);d.m.geometry.dispose();d.m.material.dispose();}}
+  P.decals=P.decals.filter(d=>d.life>0);
+  if(P.air||P.lift>0){
+    P.vy-=26*dt;P.lift+=P.vy*dt;P.spin+=P.spinV*dt;
+    if(P.lift<=0){P.lift=0;const impact=-P.vy;P.vy=0;P.air=false;P.spin=Math.atan2(Math.sin(P.spin),Math.cos(P.spin));P.spinV=0;
+      if(stage)stage.landed(P,impact);else if(impact>6){P.syV-=impact*.6;P.sxV+=impact*.5;}}
+  }else spring(P,P,"spin",0,90,12,dt);
+  P.x+=P.vx*dt;P.vx*=Math.pow(P.air?.6:.012,dt);
+  if(stage){
+    if(P.x<stage.wallL){P.x=stage.wallL;if(Math.abs(P.vx)>1.5)stage.bump(P);P.vx=Math.abs(P.vx)*.55;}
+    if(P.x>stage.wallR){P.x=stage.wallR;if(Math.abs(P.vx)>1.5)stage.bump(P);P.vx=-Math.abs(P.vx)*.55;}
+  }
+  spring(P,{get sx(){return P.sxV},set sx(v){P.sxV=v}},"sx",1,260,11,dt);
+  spring(P,{get sy(){return P.syV},set sy(v){P.syV=v}},"sy",1,260,11,dt);
+  P.sx=Math.max(.6,Math.min(1.5,P.sx));P.sy=Math.max(.55,Math.min(1.45,P.sy));
+  const T=puppetTargets(P,t);
+  for(const k in T)spring(P.a,P.av,k,T[k],k.startsWith("head")?150:130,k.startsWith("head")?7:9,dt);
+  // 套用到骨架
+  P.root.position.set(P.x,P.lift,0);P.spinG.rotation.z=P.spin;P.squash.scale.set(P.sx,P.sy,P.sx);
+  const j=P.j,a=P.a;
+  j.torso.rotation.z=a.torso;j.head.rotation.set(0,a.headY,a.headZ);
+  j.shL.rotation.z=a.shL;j.elL.rotation.z=a.elL;j.shR.rotation.z=a.shR;j.elR.rotation.z=a.elR;
+  j.hipL.rotation.z=a.hipL;j.hipR.rotation.z=a.hipR;
+  const hm=P.meshes.head;
+  if(!P.boom){if(P.wave>0){const k=P.wave/.35,w=Math.sin(t*48);hm.scale.set(1+w*.22*k,1-w*.1*k,1);}else hm.scale.set(1,1,1);}
+  updateBoom(P,dt);
+}
+
+/* ========== 共用：燈光與場景 ========== */
+function makeRenderer(cv){
+  const r=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+  r.setPixelRatio(PR());r.shadowMap.enabled=true;r.shadowMap.type=THREE.PCFSoftShadowMap;
+  if("outputEncoding" in r)r.outputEncoding=THREE.sRGBEncoding;
+  return r;
+}
+function addLights(scene,range){
+  scene.add(new THREE.HemisphereLight(0xffffff,0xbdb6a4,.95));
+  const d=new THREE.DirectionalLight(0xfff6e8,.8);d.position.set(5,12,9);d.castShadow=true;
+  d.shadow.mapSize.set(2048,2048);d.shadow.radius=4;Object.assign(d.shadow.camera,{left:-range,right:range,top:range,bottom:-range,near:1,far:40});
+  d.shadow.bias=-.0008;scene.add(d);
+  const fill=new THREE.DirectionalLight(0xbcd0ff,.35);fill.position.set(-6,4,6);scene.add(fill);
+}
+function baseplate(scene,w,d,color,y,z=0){
+  const mat=plastic(color);
+  const plate=new THREE.Mesh(new THREE.BoxGeometry(w,.3,d),mat);plate.position.set(0,y-.15,z);plate.receiveShadow=true;scene.add(plate);
+  const nx=Math.floor(w/.8),nz=Math.floor(d/.8),inst=new THREE.InstancedMesh(studGeo,mat,nx*nz);
+  const m=new THREE.Matrix4();let i=0;
+  for(let a=0;a<nx;a++)for(let b=0;b<nz;b++){m.makeTranslation((a-(nx-1)/2)*.8,y+.055,z+(b-(nz-1)/2)*.8);inst.setMatrixAt(i++,m);}
+  inst.receiveShadow=true;scene.add(inst);return plate;
+}
+
+/* ========== 彩繪室 ========== */
+const paintCv=$("paintCv");
+const pR=makeRenderer(paintCv),pScene=new THREE.Scene();
+pScene.background=new THREE.Color("#E9E8DF");
+const pCam=new THREE.PerspectiveCamera(30,400/460,.1,100);pCam.position.set(0,2.6,11);pCam.lookAt(0,2.45,0);
+addLights(pScene,6);
+{const g=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:lin("#E1DFD4"),roughness:1}));g.rotation.x=-Math.PI/2;g.position.y=-.36;g.receiveShadow=true;pScene.add(g);
+ const grey=plastic("#A9B3AE"),stand=rbox(3.4,.34,2.4,.06,grey);stand.position.y=-.17;pScene.add(stand);
+ for(const [x,z] of [[-1.35,-.85],[1.35,-.85],[-1.35,.85],[1.35,.85]]){const st=new THREE.Mesh(studGeo,grey);st.position.set(x,.055,z);st.castShadow=true;pScene.add(st);}}
+const PP=buildPuppet(pScene);let turnTarget=.25,turn=.25;
+document.querySelectorAll("[data-turn]").forEach(b=>b.onclick=()=>{const v=+b.dataset.turn;turnTarget=v===0?0:turnTarget+v*Math.PI/4;});
+
+const COLORS=[["黑","#1E1E1E"],["深灰","#555555"],["灰","#9A9A9A"],["白","#FFFFFF"],["棕","#8B5A2B"],["紅","#E53935"],["橙","#FB8C00"],["黃","#FDD835"],["綠","#43A047"],["天藍","#64B5F6"],["藍","#1E63D6"],["紫","#8E44AD"],["粉","#F48FB1"],["膚色淺","#F6D7C3"],["膚色中","#E0AC84"],["膚色深","#A86B45"]];
+let color="#1E1E1E",size=.07,eraser=false;
+const pal=$("palette");
+COLORS.forEach(([n,c],i)=>{
+  const b=document.createElement("button");b.className="sw";b.style.background=c;b.setAttribute("aria-label",n);b.setAttribute("aria-pressed",i===0?"true":"false");
+  b.onclick=()=>{color=c;eraser=false;syncTools();pal.querySelectorAll(".sw").forEach(s=>s.setAttribute("aria-pressed","false"));b.setAttribute("aria-pressed","true");};
+  pal.appendChild(b);
+});
+const sizesEl=$("sizes");
+[["細",.035,6],["中",.07,10],["粗",.14,16]].forEach(([n,v,px])=>{
+  const b=document.createElement("button");b.className="btn";b.dataset.size=v;
+  b.innerHTML=`<span class="dot" style="width:${px}px;height:${px}px"></span> ${n}`;
+  b.onclick=()=>{size=v;eraser=false;syncTools();};sizesEl.appendChild(b);
+});
+const eraBtn=document.createElement("button");eraBtn.className="btn";eraBtn.textContent="橡皮擦";
+eraBtn.onclick=()=>{eraser=!eraser;syncTools();};sizesEl.appendChild(eraBtn);
+function syncTools(){sizesEl.querySelectorAll("[data-size]").forEach(b=>b.setAttribute("aria-pressed",(!eraser&&+b.dataset.size===size)?"true":"false"));eraBtn.setAttribute("aria-pressed",eraser?"true":"false");}
+syncTools();
+
+const ALL=Object.keys(PAINT_PARTS);
+const undoStack=[],redoStack=[];
+const snap=names=>names.map(n=>({n,d:PAINT_PARTS[n].ctx.getImageData(0,0,CELL*3,CELL*2)}));
+const restore=s=>s.forEach(({n,d})=>{PAINT_PARTS[n].ctx.putImageData(d,0,0);refresh(n);});
+function pushUndo(names){undoStack.push(snap(names));if(undoStack.length>30)undoStack.shift();redoStack.length=0;syncUndo();}
+function syncUndo(){$("undo").disabled=!undoStack.length;$("redo").disabled=!redoStack.length;}
+$("undo").onclick=()=>{const s=undoStack.pop();if(!s)return;redoStack.push(snap(s.map(x=>x.n)));restore(s);syncUndo();};
+$("redo").onclick=()=>{const s=redoStack.pop();if(!s)return;undoStack.push(snap(s.map(x=>x.n)));restore(s);syncUndo();};
+$("sample").onclick=()=>{pushUndo(ALL);sampleDoodle();};
+$("clear").onclick=()=>{$("clearConfirm").hidden=false;};
+$("clearNo").onclick=()=>{$("clearConfirm").hidden=true;};
+$("clearYes").onclick=()=>{pushUndo(ALL);ALL.forEach(n=>{const P=PAINT_PARTS[n];P.ctx.fillStyle=BASE;P.ctx.fillRect(0,0,CELL*3,CELL*2);refresh(n);});$("clearConfirm").hidden=true;};
+document.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{const k=b.dataset.act;if(k==="boom")boom(PP,1);else poke(PP,k,1);});
+
+function sampleDoodle(){
+  const fillAll=(n,c)=>{for(let f=0;f<6;f++)onFace(n,f,(x,w,h)=>{x.fillStyle=c;x.fillRect(0,0,w,h);});refresh(n);};
+  ["torso","uarmL","uarmR"].forEach(n=>fillAll(n,"#64B5F6"));
+  ["thighL","thighR","shinL","shinR"].forEach(n=>fillAll(n,"#1E63D6"));
+  ["farmL","farmR"].forEach(n=>fillAll(n,"#F2D29B"));
+  ["head"].forEach(n=>fillAll(n,"#F2D29B"));
+  onFace("torso",4,(x,w,h)=>{
+    x.fillStyle="#FFFFFF";x.beginPath();x.moveTo(w/2-.35,0);x.lineTo(w/2,.45);x.lineTo(w/2+.35,0);x.closePath();x.fill();
+    x.fillStyle="#E53935";x.beginPath();x.moveTo(w/2-.1,.06);x.lineTo(w/2+.1,.06);x.lineTo(w/2+.06,.22);x.lineTo(w/2+.17,.98);x.lineTo(w/2,1.15);x.lineTo(w/2-.17,.98);x.lineTo(w/2-.06,.22);x.closePath();x.fill();
+    x.strokeStyle="#FFFFFF";x.lineWidth=.06;x.beginPath();x.moveTo(.25,.4);x.lineTo(.5,.4);x.stroke();
+  });refresh("torso");
+  for(const f of [0,1,5])onFace("head",f,(x,w,h)=>{x.fillStyle="#3A3A40";x.fillRect(0,0,w,f===5?h*.75:h*.35);});
+  onFace("head",2,(x,w,h)=>{x.fillStyle="#3A3A40";x.fillRect(0,0,w,h);});
+  onFace("head",4,(x,w,h)=>{
+    x.fillStyle="#3A3A40";x.fillRect(0,0,w,.2);
+    x.strokeStyle="#1E1E1E";x.lineCap="round";x.lineWidth=.07;
+    x.beginPath();x.moveTo(.2,.33);x.lineTo(.46,.43);x.moveTo(w-.2,.33);x.lineTo(w-.46,.43);x.stroke();
+    x.fillStyle="#1E1E1E";x.beginPath();x.arc(.36,.53,.065,0,7);x.arc(w-.36,.53,.065,0,7);x.fill();
+    x.lineWidth=.055;x.beginPath();x.moveTo(.36,.8);x.quadraticCurveTo(.6,.86,.82,.74);x.stroke();
+    x.fillStyle="rgba(244,143,177,.75)";x.beginPath();x.arc(.2,.72,.08,0,7);x.arc(w-.2,.72,.08,0,7);x.fill();
+  });refresh("head");
+}
+
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+const paintTargets=()=>ALL.map(n=>PP.meshes[n]);
+let stroke=null;
+function pick(e){
+  const r=paintCv.getBoundingClientRect();
+  ndc.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(ndc,pCam);
+  const hit=ray.intersectObjects(paintTargets(),false)[0];
+  if(!hit||!hit.uv)return null;
+  const u=hit.uv.x,v=hit.uv.y,col=Math.min(2,Math.floor(u*3)),row=Math.min(1,Math.floor(v*2));
+  return {part:hit.object.userData.part,f:row*3+col,u,v};
+}
+function toFace(h){const r=cellRect(h.f),[fw,fh]=faceDims(h.part,h.f);return {x:(h.u*CELL*3-r.x)/CELL*fw,y:((1-h.v)*CELL*2-r.y)/CELL*fh};}
+function dab(part,f,a,b){
+  onFace(part,f,x=>{
+    x.globalCompositeOperation="source-over";
+    x.strokeStyle=eraser?BASE:color;x.lineWidth=eraser?size*1.8:size;x.lineCap="round";x.lineJoin="round";
+    x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x+.001,b.y);x.stroke();
+  });refresh(part);
+}
+paintCv.addEventListener("pointerdown",e=>{
+  e.preventDefault();if(PP.boom)return;
+  const h=pick(e);if(!h){$("partName").textContent="要畫在積木人身上喔";return;}
+  paintCv.setPointerCapture(e.pointerId);pushUndo([h.part]);
+  const p=toFace(h);stroke={part:h.part,f:h.f,last:p,id:e.pointerId};
+  $("partName").textContent="正在畫："+PAINT_PARTS[h.part].label;dab(h.part,h.f,p,p);
+});
+paintCv.addEventListener("pointermove",e=>{
+  if(!stroke||e.pointerId!==stroke.id)return;
+  const h=pick(e);if(!h||h.part!==stroke.part||h.f!==stroke.f){stroke.last=null;return;}
+  const p=toFace(h);dab(h.part,h.f,stroke.last||p,p);stroke.last=p;
+});
+["pointerup","pointercancel"].forEach(ev=>paintCv.addEventListener(ev,e=>{if(stroke&&e.pointerId===stroke.id)stroke=null;}));
+$("dLine").addEventListener("input",()=>{$("dCount").textContent=[...$("dLine").value].length+"／80";});
+
+/* ========== 決鬥 ========== */
+const duelCv=$("duelCv"),dR=makeRenderer(duelCv),dScene=new THREE.Scene();
+dScene.background=new THREE.Color("#E8E7DE");dScene.fog=new THREE.Fog("#E8E7DE",30,60);
+const dCam=new THREE.PerspectiveCamera(30,800/500,.1,100);const CAM=new V3(0,4.1,18);dCam.position.copy(CAM);dCam.lookAt(0,2.85,0);
+addLights(dScene,11);
+buildArena(dScene);
+function buildArena(sc){
+  const RED="#D8322A",YEL="#F2B632",BLUE="#2A5DB0",NAVY="#1D2740";
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshStandardMaterial({color:lin("#DFDDD2"),roughness:1}));
+  ground.rotation.x=-Math.PI/2;ground.position.y=-.9;ground.receiveShadow=true;sc.add(ground);
+  const slab=rbox(19.6,.4,10,.12,plastic(NAVY));slab.position.set(0,-.68,.3);sc.add(slab);
+  // 方磚地板
+  const tA=plastic("#C7CEC2"),tB=plastic("#D8DCD2"),tg=roundGeo(.97,.12,.97,.03);
+  for(let x=-8;x<=8;x++)for(let z=-3;z<=3;z++){const t=new THREE.Mesh(tg,(x+z)&1?tA:tB);t.position.set(x,-.06,z);t.receiveShadow=true;sc.add(t);}
+  // 中央標記
+  const mark=(w,c,y)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,.02,w*.62),plastic(c));m.position.set(0,y,0);m.receiveShadow=true;sc.add(m);};
+  mark(3.2,BLUE,.005);mark(2.7,"#D8DCD2",.012);mark(1.4,RED,.02);
+  // 外框積木（上層紅黃交錯、下層藍）
+  const brick=(x,z,w,d,c,y,h,studs)=>{const b=rbox(w-.04,h,d-.04,.05,plastic(c));b.position.set(x,y,z);sc.add(b);
+    if(studs){const n=Math.max(1,Math.round(w/.5)),m2=Math.max(1,Math.round(d/.5));for(let i=0;i<n;i++)for(let j=0;j<m2;j++){const st=new THREE.Mesh(studGeo,b.material);st.position.set((i-(n-1)/2)*(w/n),h/2+.05,(j-(m2-1)/2)*(d/m2));st.castShadow=true;b.add(st);}}return b;};
+  for(let i=0;i<15;i++){const x=-8.4+i*1.2;brick(x,3.95,1.2,.8,i%2?YEL:RED,-.2,.46,true);brick(x+.6,3.95,1.2,.8,BLUE,-.55,.3,false);}
+  for(let i=0;i<8;i++){const z=-3.6+i*1.08;brick(-9.25,z,.8,1.08,BLUE,-.2,.46,true);brick(9.25,z,.8,1.08,RED,-.2,.46,true);}
+  for(let i=0;i<9;i++)brick(-8.4+i*2.1,-3.95,2.1,.7,BLUE,.1,.9,true);
+  // 角柱
+  for(const [x,z] of [[-8.6,-3.5],[8.6,-3.5],[-8.6,3.5],[8.6,3.5]]){
+    for(let i=0;i<5;i++)brick(x,z,.7,.7,x<0?BLUE:RED,.26+i*.52,.5,false);
+    brick(x,z,.78,.78,YEL,2.82,.4,true);
+  }
+  // 繩子
+  const rope=(c,y,len,x,z,rot,r)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,10),plastic(c));m.rotation.set(rot[0],0,rot[1]);m.position.set(x,y,z);m.castShadow=true;sc.add(m);};
+  const RC=[RED,"#F4F1EA",BLUE];
+  RC.forEach((c,i)=>{const y=.95+i*.62;
+    rope(c,y,17.2,0,-3.5,[0,Math.PI/2],.06);
+    rope(c,y,7,-8.6,0,[Math.PI/2,0],.06);rope(c,y,7,8.6,0,[Math.PI/2,0],.06);});
+  // 燈桿
+  for(const x of [-9.6,9.6]){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,6.4,10),plastic("#1C1C22"));pole.position.set(x,2.6,-4.6);sc.add(pole);
+    const lamp=rbox(1.1,.4,.7,.1,plastic("#1C1C22"));lamp.position.set(x*.96,5.9,-4.4);lamp.rotation.z=x<0?-.2:.2;sc.add(lamp);
+    const glow=new THREE.Mesh(new THREE.BoxGeometry(.9,.05,.5),new THREE.MeshBasicMaterial({color:"#FFF3C4"}));glow.position.set(0,-.21,0);lamp.add(glow);}
+  // 小道具
+  const bucket=new THREE.Mesh(new THREE.CylinderGeometry(.42,.34,.62,20),plastic(NAVY));bucket.position.set(7.2,.31,2.6);bucket.castShadow=true;sc.add(bucket);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(.4,.05,8,24),plastic("#3A4A70"));rim.rotation.x=Math.PI/2;rim.position.y=.31;bucket.add(rim);
+  brick(-7.3,-2.6,1.0,.8,YEL,.32,.64,true);brick(3.4,2.9,.6,.5,RED,.13,.26,true);
+}
+const DP=buildPuppet(dScene);
+// 玩家：戴拳套的積木人
+function buildPlayer(scene){
+  const L={};const root=new THREE.Group();scene.add(root);
+  const body=new THREE.Group();root.add(body);
+  const suit=plastic("#24408E"),trim=plastic("#F4F1EA"),skin=plastic("#F2D29B"),red=plastic("#D8322A"),dark=plastic("#1D2740");
+  const put=(m,parent,x,y,z)=>{m.position.set(x,y,z||0);parent.add(m);return m;};
+  for(const s of [-1,1]){const leg=new THREE.Group();leg.position.set(s*.34,1.75,0);body.add(leg);
+    put(rbox(.62,1.5,.68,.12,suit),leg,0,-.78);put(rbox(.66,.26,.98,.1,dark),leg,0,-1.6,.12);L["leg"+(s<0?"L":"R")]=leg;}
+  const torso=new THREE.Group();torso.position.y=1.75;body.add(torso);L.torso=torso;
+  put(rbox(1.4,1.36,.88,.16,suit),torso,0,.68);put(rbox(1.42,.14,.9,.05,trim),torso,0,.08);
+  const head=put(rbox(1.08,1.0,1.0,.22,skin),torso,0,1.92);studRow(head,2,1.0,skin);
+  put(rbox(1.12,.22,1.04,.08,red),head,0,.2);
+  const tail=put(rbox(.14,.42,.12,.05,red),head,0,.08,-.56);tail.rotation.x=.6;
+  for(const s of ["L","R"]){
+    const sh=new THREE.Group();sh.position.set(s==="L"?-.92:.92,1.18,0);torso.add(sh);
+    put(rbox(.44,.72,.44,.12,suit),sh,0,-.35);
+    const el=new THREE.Group();el.position.y=-.7;sh.add(el);put(rbox(.4,.56,.4,.12,skin),el,0,-.27);
+    const glove=new THREE.Mesh(new THREE.SphereGeometry(.4,24,16),red);glove.scale.set(1,1.05,1.1);glove.position.y=-.74;glove.castShadow=true;el.add(glove);
+    L["sh"+s]=sh;L["el"+s]=el;L["glove"+s]=glove;
+  }
+  const shoe=makeShoe();shoe.visible=false;L.elR.add(shoe);shoe.position.set(0,-.75,0);L.heldShoe=shoe;
+  return {root,body,L};
+}
+function makeShoe(){
+  const g=new THREE.Group(),brown=plastic("#8B5A2B");
+  const a=new THREE.Mesh(new THREE.BoxGeometry(.9,.26,.42),brown);a.castShadow=true;g.add(a);
+  const b=new THREE.Mesh(new THREE.BoxGeometry(.4,.34,.42),brown);b.position.set(-.25,.28,0);b.castShadow=true;g.add(b);
+  const s=new THREE.Mesh(new THREE.BoxGeometry(.94,.08,.46),plastic("#FFFFFF"));s.position.y=-.15;g.add(s);
+  return g;
+}
+const PL=buildPlayer(dScene);
+
+/* ---- 遊戲數值（與 SPEC 招式表一致） ---- */
+const H=4.8,PL_HALF=.7,PP_HALF=.9,ROUND=60;
+const MOVES={
+  jab:{name:"連環拳",hits:[.08,.17,.26,.35],range:.6,cd:.4,score:10,dur:.45,words:["砰！","啪！"]},
+  upper:{name:"上勾拳",hits:[.15],range:.5,cd:1.0,score:25,dur:.5,words:["咻碰！"]},
+  slap:{name:"甩巴掌",hits:[.06],range:.5,cd:.5,score:15,dur:.32,words:["啪！！"]},
+  shoe:{name:"丟鞋子",throwAt:.1,cd:.8,score:15,dur:.3,words:["咚！"]},
+};
+const SETS={hand:["jab","upper","slap"],weapon:["shoe"]};
+const DEFAULT_D=["對不起！","我錯了！","別打了啦！","是我不好！"];
+const stage={wallL:-6.6,wallR:6.6,
+  landed(P,impact){if(impact>8){boom(P,1);word("嘩啦！",P.x,1.2,"#FFC63A",1.1);G.shake=Math.max(G.shake,.25);}else if(impact>3){P.syV-=impact*.6;word("咚！",P.x,.8,"#FFC63A",.8);}},
+  bump(P){word("碰！",P.x,3,"#FFC63A",.8);burst(new V3(P.x,3,0),"star",4);}};
+
+let G;
+function newGame(){
+  return {pl:{x:-3,vx:0,dir:1,move:null,cds:{},dodge:0,dodgeCd:0,stun:0,hop:0,bob:0},mode:"hand",held:{l:false,r:false},
+    running:false,paused:false,ended:false,timeLeft:ROUND,gt:0,score:0,combo:0,maxCombo:0,lastHit:-9,recent:[],hitSeq:0,scored:new Set(),
+    proj:[],parts:[],words:[],shake:0,bubble:{text:"",at:-9,until:-9,last:""},endFired:false};
+}
+function resetPuppet(){
+  if(DP.boom){DP.boom.t=99;updateBoom(DP,0);}
+  Object.assign(DP,{x:3,lift:0,vx:0,vy:0,air:false,spin:0,spinV:0,sx:1,sy:1,sxV:0,syV:0,ai:{phase:"idle",t:6,side:-1}});
+}
+G=newGame();resetPuppet();
+
+/* ---- 特效：積木碎屑、星星、漫畫字 ---- */
+const fxEl=$("fx"),bubbleEl=$("bubble");
+const chipGeo=new THREE.BoxGeometry(.2,.12,.2),starGeo=new THREE.CylinderGeometry(.16,.16,.05,5);
+const chipMats=["#E8392B","#FFC63A","#2FB896","#64B5F6","#F48FB1","#FFFFFF"].map(plastic);
+function burst(p,kind,n){
+  for(let i=0;i<n;i++){
+    const m=new THREE.Mesh(kind==="star"?starGeo:chipGeo,kind==="star"?chipMats[1]:chipMats[i%chipMats.length]);
+    m.position.copy(p);dScene.add(m);
+    const a=Math.random()*Math.PI*2;
+    G.parts.push({m,v:new V3(Math.cos(a)*(2+Math.random()*4),3+Math.random()*5,(Math.random()-.2)*3),w:new V3(Math.random()*10,Math.random()*10,Math.random()*10),life:.7+Math.random()*.4});
+  }
+}
+function project(x,y,z){const v=new V3(x,y,z).project(dCam);const w=duelCv.clientWidth,h=duelCv.clientHeight;return {x:(v.x+1)/2*w,y:(1-v.y)/2*h};}
+function word(text,x,y,color,size,kind){
+  const el=document.createElement("div");el.className="word";el.textContent=text;
+  el.style.color=color;el.style.fontSize=Math.round(30*size*Math.min(1,duelCv.clientWidth/600)+6)+"px";fxEl.appendChild(el);
+  G.words.push({el,x,y,life:kind==="score"?.9:.6,max:kind==="score"?.9:.6,vy:kind==="score"?1.6:.6,rot:(Math.random()-.5)*16,kind});
+}
+function addScore(n,label,x,y){G.score+=n;word("+"+n+(label?" "+label:""),x,y,label?"#FFC63A":"#FFFFFF",label?.9:.62,"score");}
+
+/* ---- 命中判定 ---- */
+function inRange(range){const pl=G.pl,dx=(DP.x-pl.x)*pl.dir;if(dx<-.1)return false;return dx-(PL_HALF+PP_HALF)<=range*H;}
+function puppetHit(id,hitId,n){
+  if(G.scored.has(hitId))return; // 同一個命中事件只結算一次
+  G.scored.add(hitId);
+  const P=DP,dir=G.pl.dir,M=MOVES[id],wasAir=P.air,hy=P.lift+3.2,hx=P.x-dir*.4;
+  if(P.ai.phase!=="idle"){P.ai.phase="idle";P.ai.t=8+Math.random()*4;}
+  if(id==="jab"){poke(P,"hit",n%2?-1:1);P.vx+=dir*.9;if(P.air)P.vy=Math.max(P.vy,4);}
+  if(id==="upper"){P.air=true;P.vy=15;P.spinV=-dir*6.5;P.vx+=dir*2;P.syV+=8;}
+  if(id==="slap"){poke(P,"slap",dir);P.vx+=dir*.6;if(P.air)P.vy=Math.max(P.vy,3.5);}
+  if(id==="shoe"){P.vx+=dir*3;P.sxV+=6;P.syV-=5;P.av.torso-=dir*5;addDecal(P,"torso",shoeTex,.55,.75);}
+  burst(new V3(hx,hy,.6),"star",id==="upper"?6:3);burst(new V3(hx,hy,.6),"chip",id==="upper"?10:5);
+  if(!reduceMotion)G.shake=Math.max(G.shake,id==="upper"||id==="shoe"?.18:.08);
+  word(M.words[n%M.words.length],hx,hy+.6,"#E8392B",1);
+  const now=G.gt;
+  G.combo=(now-G.lastHit<=2)?G.combo+1:1;G.lastHit=now;G.maxCombo=Math.max(G.maxCombo,G.combo);
+  addScore(M.score,"",hx,hy+1.4);
+  if(id==="upper"&&wasAir)addScore(5,"空中追擊",hx,hy+2.1);
+  if(G.combo%10===0){addScore(50,G.combo+" 連擊！",0,6);if(!P.air)boom(P,.8);}
+  G.recent.push({id,t:now});G.recent=G.recent.filter(r=>now-r.t<=3);
+  if(new Set(G.recent.map(r=>r.id)).size>=3){addScore(40,"招式組合！",0,5.3);G.recent=[];}
+  sayD();
+}
+function sayD(){
+  const b=G.bubble,now=G.gt,minShow=1.2+[...b.text].length*.05;
+  if(b.text&&now-b.at<minShow){bubbleEl.classList.remove("shake");void bubbleEl.offsetWidth;bubbleEl.classList.add("shake");b.until=now+minShow;return;}
+  const user=$("dLine").value.trim(),pool=user?[user,...DEFAULT_D]:DEFAULT_D;
+  let next=pool[Math.floor(Math.random()*pool.length)];
+  if(pool.length>1)while(next===b.last)next=pool[Math.floor(Math.random()*pool.length)];
+  b.text=next;b.last=next;b.at=now;b.until=now+1.2+[...next].length*.05+.6;bubbleEl.textContent=next;bubbleEl.hidden=false;
+}
+function startMove(id){
+  const pl=G.pl;if(!G.running||G.paused||G.ended||pl.move||pl.stun>0||(pl.cds[id]||0)>0||pl.dodge>0)return;
+  pl.move={id,t:0,done:0,base:G.hitSeq};G.hitSeq+=10;pl.cds[id]=MOVES[id].cd;
+}
+function dodge(){const pl=G.pl;if(!G.running||G.paused||G.ended||pl.dodgeCd>0||pl.move)return;pl.dodge=.35;pl.dodgeCd=.8;pl.vx=-pl.dir*9;}
+
+function update(dt){
+  const pl=G.pl,P=DP;
+  if(G.running&&!G.paused&&!G.ended){G.gt+=dt;G.timeLeft=Math.max(0,G.timeLeft-dt);if(G.timeLeft<=0&&!G.endFired){G.endFired=true;endRound();}}
+  const live=G.running&&!G.paused&&!G.ended;
+  for(const k in pl.cds)pl.cds[k]=Math.max(0,pl.cds[k]-dt);
+  pl.dodgeCd=Math.max(0,pl.dodgeCd-dt);pl.stun=Math.max(0,pl.stun-dt);pl.bob+=dt;
+  if(pl.dodge>0){pl.dodge=Math.max(0,pl.dodge-dt);pl.hop=Math.sin((1-pl.dodge/.35)*Math.PI)*.8;}else pl.hop=0;
+  let want=0;if(live&&!pl.move&&pl.stun<=0&&pl.dodge<=0){if(G.held.l)want-=1;if(G.held.r)want+=1;}
+  if(pl.dodge<=0&&pl.stun<=0)pl.vx=want*6;else pl.vx*=Math.pow(.02,dt);
+  pl.x=Math.max(-7,Math.min(7,pl.x+pl.vx*dt));
+  if(!pl.move){const d=Math.sign(P.x-pl.x);if(d)pl.dir=d;}
+  const canHit=!P.boom;
+  if(pl.move){
+    const m=pl.move,M=MOVES[m.id];m.t+=dt;
+    if(M.hits)while(m.done<M.hits.length&&m.t>=M.hits[m.done]){
+      if(live&&canHit&&inRange(M.range)&&(m.id==="upper"?P.lift<H*1.3:P.lift<H*.9))puppetHit(m.id,m.base+m.done,m.done);
+      else if(live&&m.done===0)word("揮空",pl.x+pl.dir*1.6,3.6,"#C9D2F2",.55);
+      m.done++;
+    }
+    if(M.throwAt!==undefined&&m.done===0&&m.t>=M.throwAt){
+      m.done=1;const s=makeShoe();s.position.set(pl.x+pl.dir*.9,3.1,.3);dScene.add(s);
+      G.proj.push({m:s,vx:pl.dir*20,vy:.6,dir:pl.dir,hitId:m.base,alive:true});
+    }
+    if(m.t>=M.dur)pl.move=null;
+  }
+  for(const p of G.proj){
+    p.m.position.x+=p.vx*dt;p.vy-=6*dt;p.m.position.y+=p.vy*dt;p.m.rotation.z-=p.dir*14*dt;
+    const y=p.m.position.y;
+    if(live&&canHit&&Math.abs(p.m.position.x-P.x)<PP_HALF+.3&&y>P.lift&&y<P.lift+H){p.alive=false;puppetHit("shoe",p.hitId,0);}
+    if(Math.abs(p.m.position.x)>12||y<0)p.alive=false;
+    if(!p.alive)dScene.remove(p.m);
+  }
+  G.proj=G.proj.filter(p=>p.alive);
+  // 木偶 AI（簡單模式）
+  const ai=P.ai;
+  if(live&&!P.boom){
+    ai.t-=dt;
+    if(ai.phase==="idle"&&ai.t<=0&&!P.air){ai.phase="windup";ai.t=.8;ai.side=Math.sign(pl.x-P.x)||-1;}
+    else if(ai.phase==="windup"&&ai.t<=0){
+      ai.phase="punch";ai.t=.3;const dx=Math.abs(pl.x-P.x);
+      if(dx<H*.75&&pl.dodge<=0){pl.vx=-pl.dir*8;pl.stun=.4;word("唉唷！",pl.x,4.6,"#FFFFFF",.8);}
+      else if(pl.dodge>0&&dx<H*.9)word("閃過！",pl.x,4.8,"#2FB896",.8);
+    }else if(ai.phase==="punch"&&ai.t<=0){ai.phase="idle";ai.t=8+Math.random()*4;}
+  }else if(!G.running)ai.phase="idle";
+  updatePuppet(P,dt,performance.now()/1000,stage);
+  if(G.combo&&G.gt-G.lastHit>2)G.combo=0;
+  for(const p of G.parts){p.v.y-=16*dt;p.m.position.addScaledVector(p.v,dt);p.m.rotation.x+=p.w.x*dt;p.m.rotation.y+=p.w.y*dt;
+    if(p.m.position.y<.1){p.m.position.y=.1;p.v.y*=-.4;p.v.x*=.6;}p.life-=dt;if(p.life<=0)dScene.remove(p.m);}
+  G.parts=G.parts.filter(p=>p.life>0);
+  for(const w of G.words){w.life-=dt;w.y+=w.vy*dt;if(w.life<=0)w.el.remove();}
+  G.words=G.words.filter(w=>w.life>0);
+  G.shake=Math.max(0,G.shake-dt*.8);
+  if(G.bubble.text&&G.gt>G.bubble.until){G.bubble.text="";bubbleEl.hidden=true;}
+  posePlayer(dt);
+}
+
+function lerp(a,b,t){return a+(b-a)*t;}
+function posePlayer(dt){
+  const pl=G.pl,L=PL.L,m=pl.move,t=G.gt;
+  PL.root.position.set(pl.x,pl.hop,0);
+  const face=pl.dir>0?.85:-.85;PL.body.rotation.y+=(face-PL.body.rotation.y)*Math.min(1,dt*14);
+  PL.body.rotation.z=pl.stun>0?.22*pl.dir:(pl.dodge>0?.3*pl.dir:0);
+  // 拳架
+  let A={shL:[-.5,0],elL:-1.9,shR:[-.35,0],elR:-1.7},open=false;
+  const bob=Math.sin(pl.bob*5)*.06;A.shL[0]+=bob;A.shR[0]-=bob;
+  if(m){
+    const tt=m.t;
+    if(m.id==="jab"){const seg=Math.floor(tt/.09)%2,e=Math.sin(((tt%.09)/.09)*Math.PI),s=seg?"R":"L";A["sh"+s]=[lerp(-.5,-1.57,e),0];A["el"+s]=lerp(-1.9,0,e);}
+    if(m.id==="upper"){const p=Math.min(1,tt/.25);A.shR=[lerp(-.2,-2.9,p),0];A.elR=lerp(-1.6,-.3,p);}
+    if(m.id==="slap"){const p=Math.min(1,tt/.16);A.shR=[-1.45,lerp(-1.0,.7,p)];A.elR=0;open=true;}
+    if(m.id==="shoe"){const p=Math.min(1,tt/.12);A.shR=[lerp(1.0,-2.1,p),0];A.elR=-.3;}
+  }
+  if(pl.stun>0){A.shL=[-2.6,0];A.shR=[-2.6,0];A.elL=-.6;A.elR=-.6;}
+  const step=Math.abs(pl.vx)>.5?Math.sin(pl.bob*14)*.45:0;
+  L.legL.rotation.x=step;L.legR.rotation.x=-step;
+  for(const s of ["L","R"]){L["sh"+s].rotation.x=A["sh"+s][0];L["sh"+s].rotation.z=A["sh"+s][1];L["el"+s].rotation.x=A["el"+s];}
+  L.gloveR.scale.set(open?.5:1,open?1.35:1.05,open?1.2:1.1);
+  L.heldShoe.visible=!!(m&&m.id==="shoe"&&m.t<MOVES.shoe.throwAt);
+}
+
+/* ---- HUD 與控制 ---- */
+function fmt(s){s=Math.ceil(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
+const movesEl=$("moves");
+function syncHud(){
+  $("hTime").textContent=fmt(G.timeLeft);$("hScore").textContent=G.score;$("hCombo").textContent=G.combo;$("hMax").textContent=G.maxCombo;
+  movesEl.querySelectorAll(".mv").forEach(b=>{const id=b.dataset.id,c=G.pl.cds[id]||0;b.style.setProperty("--cd",(c/MOVES[id].cd).toFixed(3));b.querySelector(".cdt").textContent=c>0?c.toFixed(1):"";});
+  // 漫畫字與對話泡泡跟著 3D 位置
+  for(const w of G.words){const s=project(w.x,w.y,.6),k=w.life/w.max,pop=w.kind==="score"?1:1+Math.max(0,k-.7)*2;
+    w.el.style.left=s.x+"px";w.el.style.top=s.y+"px";w.el.style.opacity=Math.min(1,k*2.2);w.el.style.transform=`translate(-50%,-50%) rotate(${w.rot}deg) scale(${pop})`;}
+  if(!bubbleEl.hidden){
+    // 泡泡放在頭的側邊（遠離玩家那一側），不蓋住木偶
+    const sw=duelCv.clientWidth,sh=duelCv.clientHeight,bw=bubbleEl.offsetWidth,bh=bubbleEl.offsetHeight;
+    const hy=DP.lift+4.2,r=project(DP.x+.85,hy,0),l=project(DP.x-.85,hy,0);
+    const away=Math.sign(DP.x-G.pl.x)||1;
+    let toRight=away>0?(r.x+14+bw<=sw-6):(l.x-14-bw<6);
+    if(toRight&&r.x+14+bw>sw-6)toRight=false;
+    const x=toRight?r.x+14:l.x-14-bw;
+    bubbleEl.classList.toggle("toleft",!toRight);
+    bubbleEl.style.left=Math.max(6,Math.min(sw-bw-6,x))+"px";
+    bubbleEl.style.top=Math.max(bh/2+54,Math.min(sh-bh/2-6,r.y))+"px";}
+}
+function buildMoves(){
+  movesEl.innerHTML="";
+  SETS[G.mode].forEach((id,i)=>{
+    const b=document.createElement("button");b.className="ctl mv";b.dataset.id=id;
+    b.innerHTML=`<span class="cd"></span><span class="cdt"></span><span>${MOVES[id].name}</span><small>${i+1}</small>`;
+    b.addEventListener("pointerdown",e=>{e.preventDefault();startMove(id);b.classList.add("on");});
+    ["pointerup","pointercancel","pointerleave"].forEach(ev=>b.addEventListener(ev,()=>b.classList.remove("on")));
+    movesEl.appendChild(b);
+  });
+  $("mHand").setAttribute("aria-pressed",G.mode==="hand"?"true":"false");$("mWeapon").setAttribute("aria-pressed",G.mode==="weapon"?"true":"false");
+}
+function setMode(m){G.mode=m;buildMoves();}
+$("mHand").onclick=()=>setMode("hand");$("mWeapon").onclick=()=>setMode("weapon");buildMoves();
+function bindHold(el,key){
+  el.addEventListener("pointerdown",e=>{e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(_){}G.held[key]=true;el.classList.add("on");});
+  ["pointerup","pointercancel","lostpointercapture"].forEach(ev=>el.addEventListener(ev,()=>{G.held[key]=false;el.classList.remove("on");}));
+}
+bindHold($("kLeft"),"l");bindHold($("kRight"),"r");
+$("kDodge").addEventListener("pointerdown",e=>{e.preventDefault();dodge();});
+const show=(id,on)=>{$(id).hidden=!on;};
+function clearFx(){G.proj.forEach(p=>dScene.remove(p.m));G.parts.forEach(p=>dScene.remove(p.m));G.words.forEach(w=>w.el.remove());}
+function startRound(){
+  const mode=G.mode;clearFx();G=newGame();G.mode=mode;buildMoves();resetPuppet();
+  bubbleEl.hidden=true;G.running=true;show("ovStart",false);show("ovEnd",false);show("ovPause",false);
+}
+function pause(){if(!G.running||G.ended||G.paused)return;G.paused=true;G.held.l=G.held.r=false;show("ovPause",true);}
+function resume(){if(!G.paused)return;G.paused=false;show("ovPause",false);}
+function endRound(){
+  G.ended=true;G.running=false;G.paused=false;G.held.l=G.held.r=false;bubbleEl.hidden=true;
+  $("eScore").firstChild.textContent=G.score;$("eMax").firstChild.textContent=G.maxCombo;show("ovPause",false);show("ovEnd",true);
+}
+$("startBtn").onclick=startRound;$("againBtn").onclick=startRound;$("pauseBtn").onclick=pause;$("resumeBtn").onclick=resume;
+$("quitBtn").onclick=()=>{G.endFired=true;endRound();};$("backBtn").onclick=()=>selectTab("model");
+document.addEventListener("visibilitychange",()=>{if(document.hidden)pause();});
+addEventListener("keydown",e=>{
+  if(e.target.closest&&e.target.closest("input,textarea"))return;if(secDuel.hidden)return;
+  const k=e.key;
+  if(k==="Escape"){G.paused?resume():pause();return;}
+  if(["ArrowLeft","a","A"].includes(k)){G.held.l=true;e.preventDefault();}
+  if(["ArrowRight","d","D"].includes(k)){G.held.r=true;e.preventDefault();}
+  if(k===" "){e.preventDefault();dodge();}
+  if(k==="q"||k==="Q")setMode(G.mode==="hand"?"weapon":"hand");
+  const n=parseInt(k,10);if(n>=1&&n<=5){const id=SETS[G.mode][n-1];if(id)startMove(id);}
+});
+addEventListener("keyup",e=>{const k=e.key;if(["ArrowLeft","a","A"].includes(k))G.held.l=false;if(["ArrowRight","d","D"].includes(k))G.held.r=false;});
+
+/* ---- 分頁、尺寸、主迴圈 ---- */
+const secModel=$("secModel"),secDuel=$("secDuel");
+function selectTab(which){
+  const duel=which==="duel";secModel.hidden=duel;secDuel.hidden=!duel;
+  $("tabModel").setAttribute("aria-selected",duel?"false":"true");$("tabDuel").setAttribute("aria-selected",duel?"true":"false");
+  if(!duel)pause();resize();
+}
+$("tabModel").onclick=()=>selectTab("model");$("tabDuel").onclick=()=>selectTab("duel");$("goDuel").onclick=()=>selectTab("duel");
+function resize(){
+  if(!secModel.hidden){const w=paintCv.clientWidth,h=paintCv.clientHeight;if(w&&h){pR.setPixelRatio(PR());pR.setSize(w,h,false);pCam.aspect=w/h;pCam.updateProjectionMatrix();}}
+  if(!secDuel.hidden){const w=duelCv.clientWidth,h=duelCv.clientHeight;if(w&&h){dR.setPixelRatio(PR());dR.setSize(w,h,false);dCam.aspect=w/h;dCam.updateProjectionMatrix();}}
+}
+addEventListener("resize",resize);
+let last=performance.now(),acc=0;const STEP=1/60;const camS={x:0,d:14};
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;const t=now/1000;
+  if(!secModel.hidden){
+    turn+=(turnTarget-turn)*Math.min(1,dt*8);PP.root.rotation.y=turn;
+    updatePuppet(PP,dt,stroke?0:t*.6,null);pR.render(pScene,pCam);
+  }
+  if(!secDuel.hidden){
+    acc+=dt;while(acc>=STEP){update(STEP);acc-=STEP;}
+    // 鏡頭跟著兩人的中點，距離依兩人間距縮放，讓角色盡量大
+    const asp=dCam.aspect,tv=Math.tan(THREE.MathUtils.degToRad(dCam.fov/2));
+    const halfW=Math.min(8.4,Math.max(4.3,Math.abs(G.pl.x-DP.x)/2+2.6));
+    const dist=Math.max(halfW/(tv*asp),6.4/tv/2+1);
+    const mid=Math.max(-3.2,Math.min(3.2,(G.pl.x+DP.x)/2));
+    const k=Math.min(1,dt*4);camS.x+=(mid-camS.x)*k;camS.d+=(dist-camS.d)*k;
+    const sh=G.shake;
+    dCam.position.set(camS.x+(Math.random()-.5)*sh,3.7+camS.d*.035+(Math.random()-.5)*sh,camS.d);
+    dCam.lookAt(camS.x,2.75,0);
+    dR.render(dScene,dCam);syncHud();
+  }
+  requestAnimationFrame(frame);
+}
+sampleDoodle();syncUndo();resize();requestAnimationFrame(frame);
+})();
+</script>
