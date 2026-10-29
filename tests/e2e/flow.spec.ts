@@ -168,3 +168,21 @@ test('立體肚子可以作畫（畫進軀幹正面）', async ({ page }) => {
   expect(await purple()).toBeGreaterThan(100);
   await expect(page.getByRole('status').filter({ hasText: '正在畫：軀幹' })).toBeVisible();
 });
+
+test('一鍵隨機造型：換上臉、髮型、服裝，算一步可復原', async ({ page }) => {
+  const errors = watchConsole(page);
+  await fillWanted(page);
+  const b = bt(page);
+  await drag(page, (await b.point('torso', 4, 0.2, 0.2))!, (await b.point('torso', 4, 0.8, 0.2))!);
+  const mine = await b.painted('torso', 4);
+  await page.getByTestId('random-look').click();
+  await expect(page.getByText(/隨機造型：.+＋.+＋.+/)).toBeVisible();
+  expect(await b.painted('head', 4)).toBeGreaterThan(0);
+  await page.getByTestId('random-look').click();
+  await page.getByRole('button', { name: '復原', exact: true }).click();
+  await page.getByRole('button', { name: '復原', exact: true }).click();
+  // 回到隨機之前：只剩自己畫的那一筆
+  expect(await b.painted('torso', 4)).toBe(mine);
+  expect(await b.painted('head', 4)).toBe(0);
+  expect(errors).toEqual([]);
+});

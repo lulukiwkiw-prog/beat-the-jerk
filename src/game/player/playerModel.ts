@@ -1,6 +1,7 @@
-import { Group, Mesh, SphereGeometry, type Object3D } from 'three';
+import { CanvasTexture, CylinderGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, SRGBColorSpace, TorusGeometry, type Object3D } from 'three';
 import { plastic } from '../three/color';
-import { cachedRoundedBox, studGeometry } from '../three/geometry';
+import { srgb } from '../three/color';
+import { cachedRoundedBox } from '../three/geometry';
 
 export const PLAYER_COLORS = {
   suit: '#24408E',
@@ -23,7 +24,48 @@ export interface PlayerRig {
   gloveR: Mesh;
 }
 
-/** 玩家角色：深藍運動服、白色腰線、紅色拳套與頭帶，臉部不畫五官。 */
+let faceMat: MeshStandardMaterial | null = null;
+/** 正義臉 (・`_´・)：畫在球面貼圖的正面（u＝0.25 是 +Z） */
+function justiceFaceMaterial(): MeshStandardMaterial {
+  if (faceMat) return faceMat;
+  const skin = PLAYER_COLORS.skin;
+  const cv = document.createElement('canvas');
+  cv.width = 512;
+  cv.height = 256;
+  const c = cv.getContext('2d');
+  if (!c) return (faceMat = new MeshStandardMaterial({ color: srgb(skin), roughness: 0.32, metalness: 0 }));
+  c.fillStyle = skin;
+  c.fillRect(0, 0, 512, 256);
+  const cx = 128;
+  c.strokeStyle = '#1E1E1E';
+  c.fillStyle = '#1E1E1E';
+  c.lineCap = 'round';
+  // 往中間壓低的濃眉 ` ´
+  c.lineWidth = 7;
+  c.beginPath();
+  c.moveTo(cx - 44, 106);
+  c.lineTo(cx - 14, 118);
+  c.moveTo(cx + 44, 106);
+  c.lineTo(cx + 14, 118);
+  c.stroke();
+  // 黑豆眼 ・ ・
+  for (const dx of [-28, 28]) {
+    c.beginPath();
+    c.arc(cx + dx, 132, 7, 0, Math.PI * 2);
+    c.fill();
+  }
+  // 緊閉的一字嘴 _
+  c.lineWidth = 6;
+  c.beginPath();
+  c.moveTo(cx - 12, 160);
+  c.lineTo(cx + 12, 160);
+  c.stroke();
+  const tex = new CanvasTexture(cv);
+  tex.colorSpace = SRGBColorSpace;
+  return (faceMat = new MeshStandardMaterial({ map: tex, roughness: 0.32, metalness: 0 }));
+}
+
+/** 玩家角色：深藍運動服、白色腰線、紅色拳套與頭帶；球形頭、正義臉。 */
 export function buildPlayer(shadows = true): PlayerRig {
   const C = PLAYER_COLORS;
   const root = new Group();
@@ -52,15 +94,20 @@ export function buildPlayer(shadows = true): PlayerRig {
   body.add(torso);
   box(1.4, 1.36, 0.88, 0.16, C.suit, torso, 0, 0.68);
   box(1.42, 0.14, 0.9, 0.05, C.trim, torso, 0, 0.08);
-  const head = box(1.08, 1.0, 1.0, 0.22, C.skin, torso, 0, 1.92);
-  for (let i = 0; i < 2; i++) {
-    const s = new Mesh(studGeometry(), plastic(C.skin));
-    s.position.set((i - 0.5) * 0.42, 0.55, 0);
-    s.castShadow = shadows;
-    head.add(s);
-  }
-  box(1.12, 0.22, 1.04, 0.08, C.red, head, 0, 0.2);
-  const tail = box(0.14, 0.42, 0.12, 0.05, C.red, head, 0, 0.08, -0.56);
+  // 球形頭＋正義臉 (・`_´・)，紅頭帶繞一圈
+  const neck = new Mesh(new CylinderGeometry(0.26, 0.28, 0.2, 18), plastic(C.skin));
+  neck.position.y = 1.44;
+  torso.add(neck);
+  const head = new Mesh(new SphereGeometry(0.62, 36, 24), justiceFaceMaterial());
+  head.position.set(0, 1.98, 0);
+  head.castShadow = shadows;
+  torso.add(head);
+  const band = new Mesh(new TorusGeometry(0.6, 0.07, 10, 36), plastic(C.red));
+  band.rotation.x = Math.PI / 2 - 0.12;
+  band.position.y = 0.22;
+  band.castShadow = shadows;
+  head.add(band);
+  const tail = box(0.14, 0.42, 0.12, 0.05, C.red, head, 0, 0.12, -0.62);
   tail.rotation.x = 0.6;
   const arms: Group[] = [];
   const elbows: Group[] = [];

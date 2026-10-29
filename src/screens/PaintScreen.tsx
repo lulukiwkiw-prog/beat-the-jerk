@@ -152,6 +152,21 @@ export function PaintScreen() {
                 />
               ))}
             </div>
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn"
+                disabled={finishing}
+                data-testid="random-look"
+                onClick={() => {
+                  const names = paint.randomize();
+                  ctrl.current?.faceFront();
+                  setStatus(`隨機造型：${names.join('＋')}`);
+                }}
+              >
+                🎲 一鍵隨機造型
+              </button>
+            </div>
             {acc[lookKind] && (
               <button type="button" className="btn small" onClick={() => paint.removeAccessory(lookKind)} disabled={finishing}>
                 拿掉立體配件

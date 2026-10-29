@@ -5,7 +5,7 @@ import { History } from './history';
 import { DESIGN_SIZES, PAINT_PARTS, PART_DEFS, partFaceDims, type PaintPartId } from './parts';
 import { atlasHeight, atlasWidth, cellOrigin, DEFAULT_LAYOUT, faceDims, FACES, type Face, type FacePoint } from './faces';
 import type { AccessoryId, AccessorySlot } from './looks/accessories';
-import { lookById } from './looks/presets';
+import { lookById, looksOf, type LookPreset } from './looks/presets';
 
 export interface Surface {
   part: PaintPartId;
@@ -25,7 +25,9 @@ export interface BrushSpec {
 type FaceKey = `${PaintPartId}:${Face}`;
 type AccKey = `acc:${AccessorySlot}`;
 type HistKey = FaceKey | AccKey;
-type HistData = ImageData | AccessoryId | null;
+/** 整面同一色時只記顏色，大幅減少復原紀錄的記憶體 */
+type Solid = { solid: string };
+type HistData = ImageData | Solid | AccessoryId | null;
 export type AccessoryState = Record<AccessorySlot, AccessoryId | null>;
 
 /**
@@ -61,7 +63,7 @@ export class PaintStore {
       (key) => (isAcc(key) ? this.accessories[slotOf(key)] : this.captureFace(key)),
       (key, data) => {
         if (isAcc(key)) this.setAccessory(slotOf(key), data as AccessoryId | null);
-        else this.restoreFace(key, data as ImageData);
+        else this.restoreFace(key, data as ImageData | Solid);
       },
     );
   }
@@ -97,16 +99,29 @@ export class PaintStore {
     return [p as PaintPartId, Number(f) as Face];
   }
 
-  private captureFace(key: FaceKey): ImageData {
+  private captureFace(key: FaceKey): ImageData | Solid {
     const [part, f] = this.parse(key);
     const r = this.faceRect(f);
-    return this.surfaces[part].ctx.getImageData(r.x, r.y, r.w, r.h);
+    const img = this.surfaces[part].ctx.getImageData(r.x, r.y, r.w, r.h);
+    const d = img.data;
+    let same = true;
+    for (let i = 4; i < d.length; i += 4)
+      if (d[i] !== d[0] || d[i + 1] !== d[1] || d[i + 2] !== d[2] || d[i + 3] !== d[3]) {
+        same = false;
+        break;
+      }
+    if (same) return { solid: `rgba(${d[0]},${d[1]},${d[2]},${d[3] / 255})` };
+    return img;
   }
 
-  private restoreFace(key: FaceKey, data: ImageData) {
+  private restoreFace(key: FaceKey, data: ImageData | Solid) {
     const [part, f] = this.parse(key);
     const r = this.faceRect(f);
-    this.surfaces[part].ctx.putImageData(data, r.x, r.y);
+    const ctx = this.surfaces[part].ctx;
+    if ('solid' in data) {
+      ctx.fillStyle = data.solid;
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    } else ctx.putImageData(data, r.x, r.y);
     this.markDirty(part);
     this.touched.add(key);
   }
@@ -174,12 +189,20 @@ export class PaintStore {
   applyLook(id: string) {
     const look = lookById(id);
     if (!look) return;
-    const faceKeys: FaceKey[] = [];
+    this.history.record([...this.lookKeys(look), `acc:${look.kind}`]);
+    this.drawLook(look);
+    this.emit();
+  }
+
+  private lookKeys(look: LookPreset): FaceKey[] {
+    const keys: FaceKey[] = [];
     for (const part of Object.keys(look.paint) as PaintPartId[])
-      for (const f of Object.keys(look.paint[part]!).map(Number) as Face[]) faceKeys.push(`${part}:${f}`);
-    const accKey: AccKey = `acc:${look.kind}`;
-    this.history.record([...faceKeys, accKey]);
-    for (const k of faceKeys) {
+      for (const f of Object.keys(look.paint[part]!).map(Number) as Face[]) keys.push(`${part}:${f}`);
+    return keys;
+  }
+
+  private drawLook(look: LookPreset) {
+    for (const k of this.lookKeys(look)) {
       this.touched.add(k);
       const [part, f] = this.parse(k);
       const draw = look.paint[part]![f]!;
@@ -191,7 +214,31 @@ export class PaintStore {
       });
     }
     this.setAccessory(look.kind, look.accessory);
+  }
+
+  /**
+   * 一鍵隨機造型：先恢復空白，再隨機套一款臉、髮型、服裝（整個算 1 步，可復原）。
+   */
+  randomize(rand: () => number = Math.random) {
+    const pick = <T,>(list: T[]) => list[Math.floor(rand() * list.length)];
+    const chosen = (['face', 'hair', 'costume'] as const).map((k) => pick(looksOf(k)));
+    const keys = new Set<HistKey>([...this.touched, 'acc:face', 'acc:hair', 'acc:costume']);
+    for (const l of chosen) for (const k of this.lookKeys(l)) keys.add(k);
+    this.history.record([...keys]);
+    this.resetCanvases();
+    for (const l of chosen) this.drawLook(l);
     this.emit();
+    return chosen.map((l) => l.label);
+  }
+
+  private resetCanvases() {
+    for (const part of PAINT_PARTS) {
+      const s = this.surfaces[part];
+      s.ctx.fillStyle = PUPPET.baseColor;
+      s.ctx.fillRect(0, 0, s.canvas.width, s.canvas.height);
+      this.markDirty(part);
+    }
+    (['face', 'hair', 'costume'] as const).forEach((sl) => this.setAccessory(sl, null));
   }
 
   /** 拿掉某一類的 3D 配件（可復原）。 */
@@ -206,13 +253,7 @@ export class PaintStore {
   clearAll() {
     const keys: HistKey[] = [...this.touched, 'acc:face', 'acc:hair', 'acc:costume'];
     this.history.record(keys);
-    (['face', 'hair', 'costume'] as const).forEach((sl) => this.setAccessory(sl, null));
-    for (const part of PAINT_PARTS) {
-      const s = this.surfaces[part];
-      s.ctx.fillStyle = PUPPET.baseColor;
-      s.ctx.fillRect(0, 0, s.canvas.width, s.canvas.height);
-      this.markDirty(part);
-    }
+    this.resetCanvases();
     this.emit();
   }
 
