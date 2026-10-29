@@ -254,6 +254,16 @@ export class PaintStore {
     return `#${hx(r)}${hx(g)}${hx(b)}`;
   }
 
+  /** 測試用：計算某部位某面接近指定顏色的像素數。 */
+  colorPixels(part: PaintPartId, face: Face, hex: string): number {
+    const o = cellOrigin(face);
+    const d = this.surfaces[part].ctx.getImageData(o.x, o.y, DEFAULT_LAYOUT.cell, DEFAULT_LAYOUT.cell).data;
+    const t = hexToRgb(hex);
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - t[0]) + Math.abs(d[i + 1] - t[1]) + Math.abs(d[i + 2] - t[2]) < 40) n++;
+    return n;
+  }
+
   /** 測試用：計算某部位不是底色的像素數。 */
   paintedPixels(part: PaintPartId, face?: Face): number {
     const s = this.surfaces[part];

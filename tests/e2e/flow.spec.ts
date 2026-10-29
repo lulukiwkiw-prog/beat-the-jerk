@@ -154,3 +154,17 @@ test('髮型、服裝範例：3D 配件可復原，進擂台也穿著', async ({
   await expect.poll(() => page.evaluate(() => (window as unknown as { __bt: { battle?: { puppet: { accessoryCount: number } } } }).__bt.battle?.puppet.accessoryCount ?? 0)).toBe(2);
   expect(errors).toEqual([]);
 });
+
+test('立體肚子可以作畫（畫進軀幹正面）', async ({ page }) => {
+  await fillWanted(page);
+  const b = bt(page);
+  await page.getByRole('radio', { name: '服裝' }).click();
+  await page.getByRole('button', { name: '套用範例：恐龍裝' }).click();
+  await page.getByRole('button', { name: '紫', exact: true }).click();
+  const purple = () => page.evaluate(() => (window as unknown as { __bt: { paint: { colorPixels(p: string, f: number, h: string): number } } }).__bt.paint.colorPixels('torso', 4, '#8E44AD'));
+  expect(await purple()).toBe(0);
+  // 軀幹正面中央被立體肚子蓋住，點下去會打到肚子
+  await drag(page, (await b.point('torso', 4, 0.4, 0.5))!, (await b.point('torso', 4, 0.6, 0.55))!);
+  expect(await purple()).toBeGreaterThan(100);
+  await expect(page.getByRole('status').filter({ hasText: '正在畫：軀幹' })).toBeVisible();
+});

@@ -329,6 +329,20 @@ const crease: Draw = (c, w, h) => {
   c.stroke();
 };
 
+/** 肚子顏色畫在軀幹正面（立體肚子會顯示這一塊），座標對齊 BELLY */
+const bellyPaint = (color: string, lines?: string): Draw => (c, w, h) => {
+  ellipse(c, w / 2, h / 2 + 0.05, 0.62, 0.62, color);
+  if (lines) {
+    stroke(c, 0.03, lines);
+    c.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const y = h / 2 - 0.3 + i * 0.2;
+      c.moveTo(w / 2 - 0.3, y);
+      c.lineTo(w / 2 + 0.3, y);
+    }
+    c.stroke();
+  }
+};
 const hoof = (color: string): Draw => fillBottom(color, 0.22);
 
 const dressTop = (trim: string): Draw => (c, w, h) => {
@@ -375,7 +389,7 @@ export const LOOKS: LookPreset[] = [
   { id: 'slick', kind: 'hair', label: '西裝頭', paint: { head: hairPaint(INK, { sides: 0.35, back: 0.5, front: sidePart(INK) }) }, accessory: 'slick' },
   { id: 'buzz', kind: 'hair', label: '平頭', paint: { head: { [F.PY]: buzz('#2B2B33'), [F.PX]: all(fillTop('#6E6E76', 0.35)), [F.NX]: fillTop('#6E6E76', 0.35), [F.NZ]: fillTop('#6E6E76', 0.4), [F.PZ]: fillTop('#6E6E76', 0.2) } }, accessory: 'buzz' },
   // 服裝
-  { id: 'chickenSuit', kind: 'costume', label: '尖叫雞', paint: body({ torso: CHICK, arms: CHICK, legs: CHICK }), accessory: 'chickenSuit' },
+  { id: 'chickenSuit', kind: 'costume', label: '尖叫雞', paint: body({ torso: CHICK, arms: CHICK, legs: CHICK }, bellyPaint('#FFE680')), accessory: 'chickenSuit' },
   {
     id: 'suit', kind: 'costume', label: '西裝',
     paint: body({ torso: NAVY, arms: NAVY, legs: NAVY }, suitFront, {
@@ -398,14 +412,14 @@ export const LOOKS: LookPreset[] = [
   },
   {
     id: 'pigBody', kind: 'costume', label: '豬身體',
-    paint: body({ torso: PIG, arms: PIG, legs: PIG }, undefined, {
+    paint: body({ torso: PIG, arms: PIG, legs: PIG }, bellyPaint('#F8C8D4'), {
       foreArmL: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')) }, foreArmR: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')) },
       shinL: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')), [F.PX]: all(fill(PIG), hoof('#8E5A66')), [F.NX]: all(fill(PIG), hoof('#8E5A66')) },
       shinR: { [F.PZ]: all(fill(PIG), hoof('#8E5A66')), [F.PX]: all(fill(PIG), hoof('#8E5A66')), [F.NX]: all(fill(PIG), hoof('#8E5A66')) },
     }),
     accessory: 'pigBody',
   },
-  { id: 'dinoSuit', kind: 'costume', label: '恐龍裝', paint: body({ torso: DINO, arms: DINO, legs: DINO }), accessory: 'dinoSuit' },
+  { id: 'dinoSuit', kind: 'costume', label: '恐龍裝', paint: body({ torso: DINO, arms: DINO, legs: DINO }, bellyPaint('#F7E27A', '#D9B93A')), accessory: 'dinoSuit' },
 ];
 
 export const LOOK_KINDS: { kind: LookKind; label: string }[] = [

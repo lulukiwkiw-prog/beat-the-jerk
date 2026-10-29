@@ -126,6 +126,7 @@ export class BattleController {
     this.ledger = new ScoreLedger();
     this.clock = new RoundClock(this.roundLength);
     this.player.reset();
+    this.puppet.setStance(true, -1);
     this.puppet.reset(GAME.puppetStartX);
     this.ai.reset();
     this.shoes.clear();
@@ -250,6 +251,8 @@ export class BattleController {
 
     // 木偶 AI（簡單模式）
     const side = (Math.sign(pl.x - p.x) || -1) as -1 | 1;
+    // 面對面：木偶轉身朝向玩家，擺出前後腳站姿
+    if (!p.airborne) p.setStance(true, side);
     for (const e of this.ai.update(dt, this.live && !p.invulnerable && !p.airborne && !p.isDown, side)) {
       if (e.type === 'windup') {
         p.setAiPose('windup', e.side);

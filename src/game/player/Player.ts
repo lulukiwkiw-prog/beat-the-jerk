@@ -156,8 +156,11 @@ export class Player {
       A.elL = A.elR = -0.6;
     }
     const step = Math.abs(this.vx) > 0.5 && this.dodge <= 0 ? Math.sin(this.bob * 14) * 0.45 : 0;
-    L.legL.rotation.x = step;
-    L.legR.rotation.x = -step;
+    // 格鬥站姿：靠近對手的腳在前、另一腳在後（走路時改成擺腿）
+    const frontR = this.facing > 0;
+    const st = step === 0 ? PLAYER.stance : { front: 0, back: 0 };
+    L.legL.rotation.x = step + (frontR ? st.back : -st.front);
+    L.legR.rotation.x = -step + (frontR ? -st.front : st.back);
     L.shL.rotation.set(A.shL[0], 0, A.shL[1]);
     L.shR.rotation.set(A.shR[0], 0, A.shR[1]);
     L.elL.rotation.x = A.elL;

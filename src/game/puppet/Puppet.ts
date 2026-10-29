@@ -11,7 +11,7 @@ import { buildAccessory, type AccessorySlot } from './looks/accessories';
 import { DelayBuffer, spring0, stepSpring, type Spring } from './spring';
 
 const R = PUPPET.reactions;
-const CH = ['torsoZ', 'torsoX', 'headX', 'headY', 'headZ', 'shL', 'elL', 'shR', 'elR', 'hipL', 'hipR', 'knL', 'knR'] as const;
+const CH = ['torsoZ', 'torsoX', 'headX', 'headY', 'headZ', 'shL', 'elL', 'shR', 'elR', 'hipL', 'hipR', 'hipLx', 'hipRx', 'knL', 'knR'] as const;
 type Channel = (typeof CH)[number];
 type Pose = Record<Channel, number>;
 
@@ -35,6 +35,12 @@ export class Puppet {
   readonly root = new Group();
   private readonly spinPivot = new Group();
   private readonly squashG = new Group();
+  private readonly yawG = new Group();
+  private yaw = spring0();
+  private yawTarget = 0;
+  private stance = false;
+  private stanceFront: 'L' | 'R' = 'L';
+  private extraPaint: Mesh[] = [];
   readonly meshes = {} as Record<PaintPartId, Mesh>;
   readonly fixed = {} as Record<FixedPartId, Mesh>;
   private readonly joints: Record<string, Group> = {};
@@ -76,9 +82,11 @@ export class Puppet {
     off.position.y = -PUPPET.height / 2;
     this.spinPivot.add(off);
     off.add(this.squashG);
+    // 轉身面向對手（只轉身體，空翻仍在畫面平面上）
+    this.squashG.add(this.yawG);
     const pelvis = new Group();
     pelvis.position.y = SK.pelvisY;
-    this.squashG.add(pelvis);
+    this.yawG.add(pelvis);
     const studMat = plastic(PUPPET.baseColor);
 
     const part = (name: PaintPartId, parent: Object3D, y: number) => {
@@ -167,6 +175,7 @@ export class Puppet {
   private syncAccessories(paint: PaintStore) {
     this.accObjects.forEach((o) => o.removeFromParent());
     this.accObjects = [];
+    this.extraPaint = [];
     for (const slot of ['face', 'hair', 'costume'] as AccessorySlot[]) {
       const id = paint.accessories[slot];
       if (!id) continue;
@@ -178,6 +187,15 @@ export class Puppet {
         });
         target.add(a.object);
         this.accObjects.push(a.object);
+        // 可彩繪的配件（立體肚子）：換成所屬部位的材質，並列入作畫目標
+        a.object.traverse((o) => {
+          const pp = o.userData.paintPart as PaintPartId | undefined;
+          if (pp && (o as Mesh).isMesh) {
+            (o as Mesh).material = this.meshes[pp].material;
+            o.userData.part = pp;
+            this.extraPaint.push(o as Mesh);
+          }
+        });
       }
     }
   }
@@ -221,6 +239,7 @@ export class Puppet {
     this.vx = this.vy = this.lift = 0;
     this.airborne = false;
     this.spin = spring0();
+    this.yaw = spring0(this.yawTarget);
     this.sx = spring0(1);
     this.sy = spring0(1);
     for (const c of CH) this.pose[c] = spring0();
@@ -370,6 +389,7 @@ export class Puppet {
       }
     }
 
+    stepSpring(this.yaw, this.yawTarget, S.spin.k * 0.5, S.spin.d, dt);
     stepSpring(this.sx, 1, S.squash.k, S.squash.d, dt);
     stepSpring(this.sy, 1, S.squash.k, S.squash.d, dt);
     const L = PUPPET.squashLimits;
@@ -407,6 +427,8 @@ export class Puppet {
       elR: 0.05,
       hipL: -0.04,
       hipR: 0.04,
+      hipLx: 0,
+      hipRx: 0,
       knL: 0,
       knR: 0,
     };
@@ -419,6 +441,15 @@ export class Puppet {
     T.elR += lag * 0.5;
     T.hipL += lag * 0.2;
     T.hipR += lag * 0.2;
+    if (this.stance) {
+      const st = PUPPET.stance;
+      const front = this.stanceFront;
+      T[front === 'L' ? 'hipLx' : 'hipRx'] = -st.frontHip;
+      T[front === 'L' ? 'hipRx' : 'hipLx'] = st.backHip;
+      T.knL = st.knee;
+      T.knR = st.knee;
+      T.torsoX += st.lean;
+    }
     if (this.airborne) {
       T.shL = -2.2;
       T.shR = 2.2;
@@ -429,8 +460,8 @@ export class Puppet {
     }
     if (this.downT > 0) {
       T.torsoX = 0.35;
-      T.knL = -0.6;
-      T.knR = -0.6;
+      T.knL = 0.6;
+      T.knR = 0.6;
       T.headX = 0.2;
     }
     if (this.aiPose !== 'idle' && !this.airborne) {
@@ -476,8 +507,9 @@ export class Puppet {
     j.elL.rotation.z = p.elL.v;
     j.shR.rotation.z = p.shR.v;
     j.elR.rotation.z = p.elR.v;
-    j.hipL.rotation.z = p.hipL.v;
-    j.hipR.rotation.z = p.hipR.v;
+    j.hipL.rotation.set(p.hipLx.v, 0, p.hipL.v);
+    j.hipR.rotation.set(p.hipRx.v, 0, p.hipR.v);
+    this.yawG.rotation.y = this.yaw.v;
     j.knL.rotation.x = p.knL.v;
     j.knR.rotation.x = p.knR.v;
     const head = this.meshes.head;
@@ -493,7 +525,17 @@ export class Puppet {
 
   /** 所有可被點選彩繪的部位 mesh。 */
   paintTargets(): Mesh[] {
-    return Object.values(this.meshes);
+    return [...Object.values(this.meshes), ...this.extraPaint];
+  }
+
+  /**
+   * 對戰站姿：身體轉向對手（dir＝對手所在方向），一腳前一腳後。
+   * 彩繪室不開，維持正面站直方便作畫。
+   */
+  setStance(on: boolean, dir: -1 | 1 = -1) {
+    this.stance = on;
+    this.yawTarget = on ? dir * PUPPET.stance.yaw : 0;
+    this.stanceFront = dir < 0 ? 'L' : 'R';
   }
 
   setShadows(on: boolean) {

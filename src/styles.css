@@ -27,7 +27,8 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 button, input, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tools, .turn-row, .controls, .hud, .status { -webkit-user-select: none; user-select: none; }
 :focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 
 .app { min-height: 100dvh; }

@@ -59,6 +59,9 @@ export const PUPPET = {
     reducedMotionScale: 0.5,
   },
 
+  /** 對戰站姿：轉身角度（弧度）、前腳／後腳、膝蓋、身體前傾 */
+  stance: { yaw: 0.85, frontHip: 0.35, backHip: 0.3, knee: 0.22, lean: 0.06 },
+
   /** 彩繪室：完成動畫長度（秒） */
   finishAnimTime: 2.4,
 } as const;

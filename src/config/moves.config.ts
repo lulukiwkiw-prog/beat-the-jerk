@@ -96,6 +96,8 @@ export const PLAYER = {
   hitStun: 0.4,
   /** 出招預約（秒）：前一招收招前按下的招式會在收招後立刻出 */
   inputBuffer: 0.25,
+  /** 格鬥站姿：前腳往前、後腳往後（弧度） */
+  stance: { front: 0.3, back: 0.25 },
 } as const;
 
 /** 投射物碰撞：木偶受擊框額外寬度、移除範圍 */

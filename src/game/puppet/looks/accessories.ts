@@ -3,6 +3,7 @@ import {
 } from 'three';
 import { plastic, srgb } from '../../three/color';
 import { cachedRoundedBox } from '../../three/geometry';
+import { atlasUV } from '../faces';
 import { DESIGN_SIZES, PART_DEFS, type FixedPartId, type PaintPartId } from '../parts';
 
 /**
@@ -120,9 +121,31 @@ function dome(color: string, h: number) {
   return ball(1, color, 0, HEAD.top - 0.04, -0.02, [0.64, h, 0.6]);
 }
 
-/** 立體肚子：貼在軀幹正面的扁橢圓 */
-function belly(color: string) {
-  return ball(1, color, 0, -0.05, TORSO.front - 0.04, [0.6, 0.6, 0.2]);
+/**
+ * 立體肚子：貼在軀幹正面的扁橢圓。UV 投影到軀幹正面那一格，
+ * 所以肚子會顯示、也能畫上軀幹正面的彩繪（積木人會把它換成軀幹的材質）。
+ */
+export const BELLY = { cx: 0, cy: -0.05, rx: 0.6, ry: 0.6, rz: 0.2 } as const;
+function belly() {
+  const g = geo('bellyPaint', () => {
+    const sg = new SphereGeometry(1, 32, 20);
+    const pos = sg.attributes.position;
+    const uv = sg.attributes.uv;
+    const [w, h] = DESIGN_SIZES.torso;
+    for (let i = 0; i < pos.count; i++) {
+      const x = BELLY.cx + pos.getX(i) * BELLY.rx;
+      const y = BELLY.cy + pos.getY(i) * BELLY.ry;
+      const [u, v] = atlasUV(4, x / w + 0.5, y / h + 0.5);
+      uv.setXY(i, u, v);
+    }
+    return sg;
+  });
+  const m = new Mesh(g, plastic('#FFFFFF'));
+  m.scale.set(BELLY.rx, BELLY.ry, BELLY.rz);
+  m.position.set(BELLY.cx, BELLY.cy, TORSO.front - 0.04);
+  m.castShadow = true;
+  m.userData.paintPart = 'torso';
+  return m;
 }
 
 /** 爪子／腳趾：一排小圓錐 */
@@ -245,7 +268,7 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
     const tips = (sx: number) => group(...[-0.14, 0, 0.14].map((z, i) => box(0.12, 0.42 - i * 0.04, 0.12, 0.05, i === 1 ? '#FFE680' : Y, sx * 0.05, -0.12, z, [z * 1.5, 0, sx * 0.1])));
     const feet = (['shoeL', 'shoeR'] as const).map((p) => ({ part: p, object: claws('#FB8C00', 3, 0.24, -0.08, 0.6, 0.5, [Math.PI / 2, 0, 0]) }));
     return [
-      { part: 'torso', object: group(belly('#FFE680'), ...tail) },
+      { part: 'torso', object: group(belly(), ...tail) },
       { part: 'upperArmL', object: wing(-1) }, { part: 'upperArmR', object: wing(1) },
       { part: 'foreArmL', object: wing(-1) }, { part: 'foreArmR', object: wing(1) },
       { part: 'handL', object: tips(-1) }, { part: 'handR', object: tips(1) },
@@ -279,7 +302,7 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
     const hoofHand = () => group(box(0.56, 0.3, 0.58, 0.12, HOOF, 0, -0.12, 0), box(0.04, 0.3, 0.6, 0.01, '#5A2E38', 0, -0.12, 0));
     const hoofFoot = () => group(box(0.8, 0.32, 1.12, 0.12, HOOF, 0, 0.02, 0), box(0.04, 0.33, 0.5, 0.01, '#5A2E38', 0, 0.02, 0.32));
     return [
-      { part: 'torso', object: group(belly('#F8C8D4'), tail) },
+      { part: 'torso', object: group(belly(), tail) },
       { part: 'handL', object: hoofHand() }, { part: 'handR', object: hoofHand() },
       { part: 'shoeL', object: hoofFoot() }, { part: 'shoeR', object: hoofFoot() },
     ];
@@ -303,7 +326,7 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
     const hand = () => group(box(0.54, 0.52, 0.56, 0.2, G, 0, 0, 0), claws('#FFFFFF', 3, 0.14, -0.3, 0.18, 0.2, [Math.PI * 0.85, 0, 0]));
     const foot = () => group(box(0.8, 0.3, 1.14, 0.12, G, 0, 0.02, 0), claws('#FFFFFF', 3, 0.24, -0.02, 0.62, 0.22, [Math.PI / 2, 0, 0]));
     return [
-      { part: 'torso', object: group(belly('#F7E27A'), ...spikes, tail) },
+      { part: 'torso', object: group(belly(), ...spikes, tail) },
       { part: 'handL', object: hand() }, { part: 'handR', object: hand() },
       { part: 'shoeL', object: foot() }, { part: 'shoeR', object: foot() },
     ];
