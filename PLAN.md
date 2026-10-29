@@ -213,4 +213,5 @@ interface HitEvent { hitId: HitId; moveId: MoveId; segment: number; at: number; 
 ## 6. 已確認的決策（使用者回覆）
 - 階段 1 擂台：「擂台預覽」畫面＋測試按鈕（每顆都有作用），階段 2 換成正式戰鬥。
 - 對話泡泡空間不足：寬度縮到側邊可用寬度並自動換行；仍放不下才縮小字級；絕不蓋住身體、不放頭頂。
-- 版本保存：每階段 commit 後推到 https://github.com/lulukiwkiw-prog/beat-the-jerk（目前推送權限被拒，待使用者授權 Claude GitHub App）。
+- 版本保存：每階段 commit 後推到 https://github.com/lulukiwkiw-prog/beat-the-jerk。
+- 彩繪室加入 4 款搞笑臉部範例（鬥雞眼暴牙、歪嘴挑眉、哭哭鼻涕、翻白眼吐舌）：直接疊畫進頭部正面的彩繪貼圖，可再用筆刷修改、可復原（使用者在階段 1 後追加，SPEC 未規定）。

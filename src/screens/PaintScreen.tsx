@@ -9,6 +9,8 @@ import { dispatch } from '../state/app';
 import { enabledB, useSession } from '../state/session';
 import { resetBubbleScale } from '../ui/bubble';
 import { NoWebGL } from '../ui/NoWebGL';
+import { FacePresetButton } from '../ui/FacePresetButton';
+import { FACE_PRESETS } from '../game/puppet/facePresets';
 
 type Brush = (typeof PAINT.brushes)[number]['id'];
 
@@ -123,6 +125,24 @@ export function PaintScreen() {
               <button type="button" className="btn" aria-pressed={eraser} onClick={() => setEraser((v) => !v)}>
                 橡皮擦
               </button>
+            </div>
+          </div>
+          <div className="tool-group">
+            <span className="tool-label">臉部範例（疊畫在臉上，可以再修改或復原）</span>
+            <div className="face-row">
+              {FACE_PRESETS.map((f) => (
+                <FacePresetButton
+                  key={f.id}
+                  id={f.id}
+                  label={f.label}
+                  disabled={finishing}
+                  onPick={(id) => {
+                    paint.applyFace(id);
+                    ctrl.current?.faceFront();
+                    setStatus(`畫上了：${f.label}`);
+                  }}
+                />
+              ))}
             </div>
           </div>
           <div className="tool-group">

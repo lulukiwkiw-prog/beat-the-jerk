@@ -3,7 +3,8 @@ import { PAINT } from '../../config/paint.config';
 import { PUPPET } from '../../config/puppet.config';
 import { History } from './history';
 import { PAINT_PARTS, PART_DEFS, type PaintPartId } from './parts';
-import { atlasHeight, atlasWidth, cellOrigin, DEFAULT_LAYOUT, faceDims, FACES, type Face, type FacePoint } from './faces';
+import { atlasHeight, atlasWidth, cellOrigin, DEFAULT_LAYOUT, FACE_FRONT, faceDims, FACES, type Face, type FacePoint } from './faces';
+import { drawFacePreset, type FacePresetId } from './facePresets';
 
 export interface Surface {
   part: PaintPartId;
@@ -142,6 +143,15 @@ export class PaintStore {
       c.lineTo(b.x + 0.0001, b.y);
       c.stroke();
     });
+  }
+
+  /** 套用臉部範例：疊畫在頭部正面，可復原（算 1 步）。 */
+  applyFace(id: FacePresetId) {
+    const key: FaceKey = `head:${FACE_FRONT}`;
+    this.history.record([key]);
+    this.touched.add(key);
+    this.withFace('head', FACE_FRONT, (c, w, h) => drawFacePreset(id, c, w, h));
+    this.emit();
   }
 
   /** 清空全部彩繪（可復原，算 1 步）。 */

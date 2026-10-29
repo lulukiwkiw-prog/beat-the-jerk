@@ -134,3 +134,24 @@ test('裝置不支援 WebGL 時顯示說明文字', async ({ page }) => {
   await page.getByTestId('go-duel').click();
   await expect(page.getByText('這台裝置無法顯示 3D 畫面')).toBeVisible();
 });
+
+test('臉部範例：疊畫在頭部正面，可以復原', async ({ page }) => {
+  const errors = watchConsole(page);
+  await fillWanted(page);
+  const b = bt(page);
+  // 先自己畫一筆
+  await drag(page, (await b.point('head', 4, 0.1, 0.1))!, (await b.point('head', 4, 0.9, 0.1))!);
+  const mine = await b.painted('head', 4);
+  expect(mine).toBeGreaterThan(100);
+  await page.getByRole('button', { name: '套用臉部範例：鬥雞眼暴牙' }).click();
+  const withFace = await b.painted('head', 4);
+  expect(withFace).toBeGreaterThan(mine + 2000);
+  // 疊在原本的畫上：原本的筆畫還在（復原後回到只有原本那一筆）
+  await page.getByRole('button', { name: '復原', exact: true }).click();
+  expect(await b.painted('head', 4)).toBe(mine);
+  await page.getByRole('button', { name: '重做', exact: true }).click();
+  expect(await b.painted('head', 4)).toBe(withFace);
+  // 其他面不受影響
+  for (const f of [0, 1, 2, 3, 5]) expect(await b.painted('head', f)).toBe(0);
+  expect(errors).toEqual([]);
+});
