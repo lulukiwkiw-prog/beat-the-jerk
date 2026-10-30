@@ -6,8 +6,6 @@ import { PART_DEFS, type PaintPartId } from '../game/puppet/parts';
 import { PaintRoomController } from '../game/paintRoomController';
 import { webglSupported } from '../game/three/renderer';
 import { dispatch } from '../state/app';
-import { enabledB, useSession } from '../state/session';
-import { resetBubbleScale } from '../ui/bubble';
 import { NoWebGL } from '../ui/NoWebGL';
 import { LookButton } from '../ui/LookButton';
 import { LOOK_KINDS, looksOf, type LookKind } from '../game/puppet/looks/presets';
@@ -17,9 +15,7 @@ type Brush = (typeof PAINT.brushes)[number]['id'];
 
 /** 步驟 1：木偶彩繪室 */
 export function PaintScreen() {
-  const session = useSession();
   const stageRef = useRef<HTMLDivElement>(null);
-  const bubbleRef = useRef<HTMLDivElement>(null);
   const ctrl = useRef<PaintRoomController | null>(null);
   const paint = getPaintStore();
   const [color, setColor] = useState<string>(PAINT.colors[0].hex);
@@ -31,7 +27,6 @@ export function PaintScreen() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [hist, setHist] = useState({ undo: paint.history.canUndo, redo: paint.history.canRedo });
   const [finishing, setFinishing] = useState(false);
-  const [line, setLine] = useState<string | null>(null);
   const [gl] = useState(webglSupported);
   const [lookKind, setLookKind] = useState<LookKind>('face');
   const [acc, setAcc] = useState(paint.accessories);
@@ -44,7 +39,6 @@ export function PaintScreen() {
       onPickModeChange: setPickMode,
     });
     ctrl.current = c;
-    c.setBubble(bubbleRef.current);
     if (import.meta.env.DEV) (window as unknown as { __bt: unknown }).__bt = { paint, paintRoom: c };
     const off = paint.onChange(() => {
       setHist({ undo: paint.history.canUndo, redo: paint.history.canRedo });
@@ -66,14 +60,10 @@ export function PaintScreen() {
 
   const finish = () => {
     if (finishing) return;
-    const lines = enabledB(session);
-    const pickLine = lines.length ? lines[Math.floor(Math.random() * lines.length)] : null;
     setFinishing(true);
-    setLine(pickLine);
     // 手機上工具列在下方，先把積木人捲回畫面中，才看得到完成動畫
     stageRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    if (bubbleRef.current) resetBubbleScale(bubbleRef.current);
-    ctrl.current?.playFinish(!!pickLine);
+    ctrl.current?.playFinish();
     window.setTimeout(() => dispatch('START_DUEL'), (gl ? PUPPET.finishAnimTime : 0.2) * 1000);
   };
 
@@ -90,9 +80,6 @@ export function PaintScreen() {
         <section className="paint-stage-box">
           <div className="paint-stage" ref={stageRef} data-testid="paint-stage">
             {!gl && <NoWebGL />}
-            <div className="bubble" ref={bubbleRef} hidden={!line} data-testid="paint-bubble">
-              {line}
-            </div>
           </div>
           <div className="turn-row">
             <button type="button" className="btn" onClick={() => ctrl.current?.turnBy(-1)} disabled={finishing}>↶ 向左轉</button>

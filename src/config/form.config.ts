@@ -1,9 +1,6 @@
 /** 步驟 0 通緝單欄位限制（SPEC 第 6 節） */
 export const FORM = {
   aMax: 300,
-  bMax: 80,
-  bDefaultRows: 3,
-  bMaxRows: 8,
   dMax: 80,
   dDefaultRows: 1,
   dMaxRows: 5,

@@ -14,7 +14,6 @@ for (const s of SIZES) {
     await page.setViewportSize({ width: s.width, height: s.height });
     await page.goto('/?round=8');
     await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
-    await page.getByTestId('field-b-0').fill('這點小事都做不好？');
     await page.getByRole('button', { name: '委屈', exact: true }).click();
     await page.getByTestId('field-d-0').fill('不是你的錯');
     await page.screenshot({ path: `${DIR}/${s.name}-01-wanted.png` });
@@ -33,8 +32,9 @@ for (const s of SIZES) {
     const skip = page.getByRole('button', { name: '略過' });
     if (await skip.isVisible()) await skip.click();
     await page.getByTestId('begin-battle').click();
-    await expect(page.getByTestId('battle-bubble')).toBeVisible({ timeout: 20_000 });
-    await page.screenshot({ path: `${DIR}/${s.name}-03-taunt.png` });
+    await expect(page.getByTestId('battle-stage').locator('canvas')).toBeVisible({ timeout: 20_000 });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${DIR}/${s.name}-03-countdown.png` });
     await waitPhase(page, 'fight');
     const st = await b.battle();
     await b.setPlayerX(st.puppetX - 2.2);

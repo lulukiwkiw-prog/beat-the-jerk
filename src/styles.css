@@ -310,11 +310,7 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
 .battle-bubble { z-index: 3; }
 .bubble.shake { animation: bubble-shake 0.2s; }
 @keyframes bubble-shake { 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
-.shatter { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.shard { position: absolute; font-weight: 900; font-size: clamp(13px, 2.6vw, 18px); color: var(--ink); line-height: 1.35; }
-.shard.star { color: var(--sun); -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; }
-.taunt-skip { position: absolute; right: 10px; bottom: 10px; z-index: 4; }
-.battle-extra { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.battle-extra { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .btn[role='switch'][aria-checked='true'] { background: var(--ink); color: #fff; }
 
 /* ---------- 道歉、結尾（擂台放大成全畫面） ---------- */
@@ -431,12 +427,13 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
   .arena-screen > .note { display: none; }
   /* 決鬥：戰鬥區在中間，按鈕在兩側 */
   .battle-screen { max-width: none; padding-top: max(6px, env(safe-area-inset-top, 0px)); padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)); }
-  .battle-wrap { display: grid; grid-template-columns: 150px minmax(0, 1fr) 160px; grid-template-areas: 'left stage right'; gap: 8px; height: calc(100dvh - 14px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+  .battle-wrap { display: grid; grid-template-columns: 150px minmax(0, 1fr) 160px; grid-template-rows: auto minmax(0, 1fr); grid-template-areas: 'extra stage right' 'left stage right'; gap: 8px; height: calc(100dvh - 14px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   .battle-stage { grid-area: stage; aspect-ratio: auto; height: 100%; }
   .controls { display: contents; }
   .pad-left { grid-area: left; align-self: end; grid-template-columns: 1fr 1fr; }
   .pad-left [aria-label='閃避'] { grid-column: 1 / -1; order: 3; }
   .pad-right { grid-area: right; align-self: end; }
+  .battle-extra { grid-area: extra; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
   .moves, .moves[data-count='4'] { grid-template-columns: 1fr 1fr; gap: 6px; }
   .ctl { height: 54px; }
   .mv { height: 50px; font-size: 13px; }

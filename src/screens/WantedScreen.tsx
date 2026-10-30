@@ -75,28 +75,9 @@ export function WantedScreen() {
           />
         </section>
 
-        <section className="q">
-          <h3>B．{t('{他}')}說過什麼賤話？<span className="opt">選填</span></h3>
-          {s.b.map((line, i) => (
-            <div className="line-row" key={line.id}>
-              <CharField
-                ariaLabel={`B 第 ${i + 1} 句`}
-                value={line.text}
-                onChange={(text) => updateSession((p) => ({ b: p.b.map((l) => (l.id === line.id ? { ...l, text } : l)) }))}
-                max={FORM.bMax}
-                testId={`field-b-${i}`}
-              />
-            </div>
-          ))}
-          {s.b.length < FORM.bMaxRows && (
-            <button type="button" className="btn small" onClick={() => updateSession((p) => ({ b: [...p.b, { id: newId(), text: '', inBattle: true }] }))}>
-              ＋ 再加一句（{s.b.length}／{FORM.bMaxRows}）
-            </button>
-          )}
-        </section>
 
         <section className="q">
-          <h3>C．{t('{你}')}當時的心情？<span className="opt">選填，可複選</span></h3>
+          <h3>B．{t('{你}')}當時的心情？<span className="opt">選填，可複選</span></h3>
           <div className="chips" role="group" aria-label="心情">
             {allFeelings.map((f) => (
               <span key={f} className="chip-wrap">
@@ -124,11 +105,11 @@ export function WantedScreen() {
         </section>
 
         <section className="q">
-          <h3>D．{t('{你}希望{他}對{你}說什麼？')}<span className="opt">選填</span></h3>
+          <h3>C．{t('{你}希望{他}對{你}說什麼？')}<span className="opt">選填</span></h3>
           {s.d.map((line, i) => (
             <div className="line-row" key={line.id}>
               <CharField
-                ariaLabel={`D 第 ${i + 1} 句`}
+                ariaLabel={`C 第 ${i + 1} 句`}
                 value={line.text}
                 onChange={(text) => updateSession((p) => ({ d: p.d.map((l) => (l.id === line.id ? { ...l, text } : l)) }))}
                 max={FORM.dMax}
@@ -140,7 +121,7 @@ export function WantedScreen() {
                   <button
                     type="button"
                     className="btn small ghost"
-                    aria-label={`刪除 D 第 ${i + 1} 句`}
+                    aria-label={`刪除 C 第 ${i + 1} 句`}
                     onClick={() => updateSession((p) => ({ d: p.d.filter((l) => l.id !== line.id) }))}
                   >
                     刪除

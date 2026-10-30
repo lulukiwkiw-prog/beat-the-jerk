@@ -3,7 +3,7 @@ import { bt, drag, fillWanted, watchConsole } from './helpers';
 
 test('填表 → 3D 彩繪（正面、側面、背面）→ 擂台預覽受擊與噴飛', async ({ page }) => {
   const errors = watchConsole(page);
-  await fillWanted(page, '明明是他沒做事，卻當眾怪我。', '這點小事都做不好？');
+  await fillWanted(page, '明明是他沒做事，卻當眾怪我。');
   const b = bt(page);
 
   // 正面：一筆從頭的正面拉到側邊外，筆畫只留在起筆的那一面
@@ -39,9 +39,7 @@ test('填表 → 3D 彩繪（正面、側面、背面）→ 擂台預覽受擊�
   await page.getByRole('button', { name: '取消' }).click();
   expect(await b.painted('head', 4)).toBeGreaterThan(200);
 
-  // 完成動畫：冒出一則啟用的 B
   await page.getByTestId('go-duel').click();
-  await expect(page.getByTestId('paint-bubble')).toHaveText('這點小事都做不好？');
 
   // 開戰準備 → 決鬥：同一份彩繪
   await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
@@ -50,17 +48,16 @@ test('填表 → 3D 彩繪（正面、側面、背面）→ 擂台預覽受擊�
   // 回彩繪室、回通緝單，資料仍在
   await page.getByRole('button', { name: '← 回通緝單' }).click();
   await expect(page.getByTestId('field-a')).toHaveValue('明明是他沒做事，卻當眾怪我。');
-  await expect(page.getByTestId('field-b-0')).toHaveValue('這點小事都做不好？');
 
   expect(errors).toEqual([]);
 });
 
-test('沒有啟用的 B 時，完成動畫只顯示滑稽表情、不出現文字', async ({ page }) => {
+test('完成動畫只顯示滑稽表情、不出現文字', async ({ page }) => {
   const errors = watchConsole(page);
   await fillWanted(page);
   await page.getByTestId('go-duel').click();
   await page.waitForTimeout(500);
-  await expect(page.getByTestId('paint-bubble')).toBeHidden();
+  await expect(page.getByTestId('paint-bubble')).toHaveCount(0);
   await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
   expect(errors).toEqual([]);
 });

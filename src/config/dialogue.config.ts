@@ -3,14 +3,6 @@ export const DIALOGUE = {
   /** 每則最短顯示時間＝base＋每字 perChar 秒 */
   base: 1.2,
   perChar: 0.05,
-  /** 開場挑釁：每句之間的停頓 */
-  tauntGap: 0.35,
-  /** 戰鬥中賤話（開啟時）：木偶未受擊時每 6～10 秒說一則 */
-  chatterMin: 6,
-  chatterMax: 10,
-  /** 打碎賤話 */
-  shatterTime: 0.6,
-  shatterBonus: 5,
   /** 沒有 D 時的預設句 */
   defaultD: ['對不起！', '我錯了！', '別打了啦！', '是我不好！'],
   /** 泡泡最寬為畫面寬度比例 */

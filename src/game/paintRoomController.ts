@@ -2,7 +2,6 @@ import { Box3, Raycaster, Vector2, Vector3, type Mesh } from 'three';
 import { PAINT } from '../config/paint.config';
 import { PUPPET } from '../config/puppet.config';
 import { prefersReducedMotion } from '../state/settings';
-import { layoutBubble } from '../ui/bubble';
 import { faceFromUV, uvToFacePointDims, type Face, type FacePoint } from './puppet/faces';
 import type { BrushSpec, PaintStore } from './puppet/paintSurface';
 import { PART_DEFS, partFaceDims, type PaintPartId } from './puppet/parts';
@@ -25,7 +24,6 @@ interface Stroke {
 }
 
 const FULL_TARGET = new Vector3(0, 2.45, 0);
-const BODY_HALF_WIDTH = 1.75;
 
 /**
  * 彩繪室的 3D 端：在積木人表面作畫、轉向、點選部位放大。
@@ -44,7 +42,6 @@ export class PaintRoomController {
   private camTarget = FULL_TARGET.clone();
   private camDist = 11;
   private locked = false;
-  private bubbleEl: HTMLElement | null = null;
   private readonly canvas: HTMLCanvasElement;
 
   constructor(container: HTMLElement, private readonly paint: PaintStore, private readonly ev: PaintRoomEvents) {
@@ -61,7 +58,7 @@ export class PaintRoomController {
     this.camDist = this.fullDistance();
     this.host.start({
       update: (dt) => this.update(dt),
-      beforeRender: (_dt, size) => this.render(size),
+      beforeRender: () => this.render(),
     });
   }
 
@@ -88,19 +85,15 @@ export class PaintRoomController {
     this.ev.onZoomChange(part);
   }
 
-  setBubble(el: HTMLElement | null) {
-    this.bubbleEl = el;
-  }
-
   /** 完成動畫：得意晃動；沒有 B 時顯示滑稽表情。 */
-  playFinish(hasLine: boolean) {
+  playFinish() {
     this.locked = true;
     this.stroke = null;
     this.zoomTo(null);
     this.setPickMode(false);
     this.turnTarget = Math.round(this.turnTarget / (Math.PI * 2)) * Math.PI * 2 + 0.25;
     this.puppet.gloat();
-    if (!hasLine) this.puppet.sillyFace(PUPPET.finishAnimTime);
+    this.puppet.sillyFace(PUPPET.finishAnimTime);
   }
 
   private fullDistance() {
@@ -134,24 +127,8 @@ export class PaintRoomController {
     cam.lookAt(this.camTarget);
   }
 
-  private render(size: { width: number; height: number }) {
+  private render() {
     this.paint.flush();
-    if (this.bubbleEl && !this.bubbleEl.hidden) {
-      // 以頭部高度、身體（含舉起的手臂）最外緣為界，泡泡不蓋住積木人
-      const head = this.puppet.meshes.head.getWorldPosition(new Vector3());
-      const cam = this.host.camera;
-      const l = projectToScreen(head.x - BODY_HALF_WIDTH, head.y + 0.2, head.z, cam, size.width, size.height);
-      const r = projectToScreen(head.x + BODY_HALF_WIDTH, head.y + 0.2, head.z, cam, size.width, size.height);
-      layoutBubble(this.bubbleEl, {
-        headLeft: l.x,
-        headRight: r.x,
-        headY: r.y,
-        prefer: 'right',
-        topReserve: 0,
-        screenWidth: size.width,
-        screenHeight: size.height,
-      });
-    }
   }
 
   // ---------- 作畫 ----------

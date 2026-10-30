@@ -6,7 +6,7 @@ import { getPaintStore } from '../game/puppet/paintSurface';
 import { webglSupported } from '../game/three/renderer';
 import { dispatch, screenStore, useScreen } from '../state/app';
 import { battleStore, effectiveRoundLength, resultStore, updateBattle } from '../state/battle';
-import { enabledB, filledD, resetForNewJerk, sessionStore, useSession } from '../state/session';
+import { filledD, resetForNewJerk, sessionStore, useSession } from '../state/session';
 import { fillPronouns } from '../state/text';
 import { APOLOGY } from '../config/dialogue.config';
 import { ApologyOverlay, WorthyOverlay } from '../ui/flow/ApologyOverlay';
@@ -17,7 +17,7 @@ import { openSettings, useSettingsOpen } from '../ui/SettingsPanel';
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 const INITIAL: HudState = {
-  phase: 'taunt', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false, chatter: false,
+  phase: 'countdown', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false,
 };
 
 /** 步驟 2～結尾：決鬥、道歉、結尾都在同一個 3D 擂台場景裡 */
@@ -65,7 +65,7 @@ export function BattleScreen() {
           dispatch('END_ROUND');
         },
       },
-      { taunts: enabledB(ses), dLines: filledD(ses) },
+      { dLines: filledD(ses) },
     );
     ctrl.current = c;
     if (import.meta.env.DEV) {
@@ -160,11 +160,6 @@ export function BattleScreen() {
               </button>
             </div>
           </div>
-          )}
-          {!inStory && hud.phase === 'taunt' && session.b.some((l) => l.inBattle && l.text.trim()) && (
-            <button type="button" className="btn small taunt-skip" onClick={() => ctrl.current?.skipTaunt()} data-testid="skip-taunt">
-              跳過挑釁
-            </button>
           )}
           {confirmEnd && !inStory && (
             <div className="overlay" data-testid="confirm-end">
@@ -308,16 +303,6 @@ export function BattleScreen() {
         )}
         {!inStory && (
           <div className="battle-extra">
-            <button
-              type="button"
-              className="btn small"
-              role="switch"
-              aria-checked={hud.chatter}
-              onClick={() => ctrl.current?.setChatter(!hud.chatter)}
-              data-testid="chatter"
-            >
-              賤話：{hud.chatter ? '開' : '關'}
-            </button>
             <button
               type="button"
               className="btn small"

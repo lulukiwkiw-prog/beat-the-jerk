@@ -10,10 +10,9 @@ export function watchConsole(page: Page) {
   return errors;
 }
 
-export async function fillWanted(page: Page, a = '明明是他沒做事，卻當眾怪我。', b?: string) {
+export async function fillWanted(page: Page, a = '明明是他沒做事，卻當眾怪我。') {
   await page.goto('/');
   await page.getByTestId('field-a').fill(a);
-  if (b !== undefined) await page.getByTestId('field-b-0').fill(b);
   await page.getByTestId('go-paint').click();
   await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
   await page.waitForFunction(() => !!(window as unknown as { __bt?: { paintRoom?: { isSettled: boolean } } }).__bt?.paintRoom?.isSettled);

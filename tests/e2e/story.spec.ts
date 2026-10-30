@@ -2,7 +2,6 @@ import { expect, test, type Page } from '@playwright/test';
 import { bt, quickBattle, throughApology, waitPhase, watchConsole } from './helpers';
 
 const fillAll = async (p: Page) => {
-  await p.getByTestId('field-b-0').fill('這點小事都做不好？');
   await p.getByRole('button', { name: '委屈', exact: true }).click();
   await p.getByRole('button', { name: '生氣', exact: true }).click();
   await p.getByTestId('field-d-0').fill('不是你的錯');
@@ -23,7 +22,7 @@ async function finishCalm(page: Page) {
   await expect(page.getByTestId('final')).toBeVisible();
 }
 
-test('完整流程：開場挑釁 → 戰鬥 D 對話 → 道歉稿 → 值得聽到 → 結局「原諒」→ 降溫 → 下一步', async ({ page }) => {
+test('完整流程：戰鬥 D 對話 → 道歉稿 → 值得聽到 → 結局「原諒」→ 降溫 → 下一步', async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto('/?round=8');
   await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
@@ -35,10 +34,9 @@ test('完整流程：開場挑釁 → 戰鬥 D 對話 → 道歉稿 → 值得�
   const skip = page.getByRole('button', { name: '略過' });
   if (await skip.isVisible()) await skip.click();
   await page.getByTestId('begin-battle').click();
-  // 開場挑釁：說出填寫的 B
-  await expect(page.getByTestId('battle-bubble')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('battle-bubble')).toHaveText('這點小事都做不好？');
   await waitPhase(page, 'fight');
+  // 沒有開場挑釁，被打中前不說話
+  await expect(page.getByTestId('battle-bubble')).toBeHidden();
   const b = bt(page);
   const s = await b.battle();
   await b.setPlayerX(s.puppetX - 2.2);
@@ -55,8 +53,8 @@ test('完整流程：開場挑釁 → 戰鬥 D 對話 → 道歉稿 → 值得�
   await page.getByTestId('apology-all').click();
   const text = await page.getByTestId('apology').innerText();
   expect(text).toContain('「明明是他沒做事，卻當眾怪我。」');
-  expect(text).toContain('「這點小事都做不好？」');
-  expect(text).toContain('原來這些話，讓你感到委屈和生氣。');
+  expect(text).not.toContain('我當時還說');
+  expect(text).toContain('原來這件事，讓你感到委屈和生氣。');
   expect(text).toContain('不是你的錯');
   expect(text).toContain('原不原諒，由你決定。');
   await page.getByTestId('apology-next').click();
@@ -102,9 +100,9 @@ for (const [id, text] of [
   });
 }
 
-test('結局「我還有其他爛人要打」：清空 A～D，不沿用外觀時彩繪也清空', async ({ page }) => {
+test('結局「我還有其他爛人要打」：清空通緝單，不沿用外觀時彩繪也清空', async ({ page }) => {
   await quickBattle(page, 5, async (p) => {
-    await p.getByTestId('field-b-0').fill('賤話');
+    await p.getByTestId('field-d-0').fill('想聽的話');
   });
   await throughApology(page);
   await page.getByTestId('ending-new').click();
@@ -113,7 +111,7 @@ test('結局「我還有其他爛人要打」：清空 A～D，不沿用外觀�
   await expect(page.getByTestId('reuse-look')).toBeVisible();
   await page.getByRole('button', { name: '否', exact: true }).click();
   await expect(page.getByTestId('field-a')).toHaveValue('');
-  await expect(page.getByTestId('field-b-0')).toHaveValue('');
+  await expect(page.getByTestId('field-d-0')).toHaveValue('');
   const painted = await page.evaluate(() => (window as unknown as { __bt: { paint: { paintedPixels(p: string): number } } }).__bt.paint.paintedPixels('torso'));
   expect(painted).toBe(0);
 });
@@ -150,25 +148,17 @@ test('「打夠了，聽他說」：先確認一次，提前進入道歉', async
   await expect(page.getByTestId('apology')).toBeVisible({ timeout: 20_000 });
 });
 
-test('賤話預設關；打開後木偶說 B，打中時碎成星星並 +5', async ({ page }) => {
+test('戰鬥中沒有賤話開關、跳過挑釁鈕；被打中才說想聽的話', async ({ page }) => {
   await quickBattle(page, 60, async (p) => {
-    await p.getByTestId('field-b-0').fill('賤話一號');
+    await p.getByTestId('field-d-0').fill('不是你的錯');
   });
-  await expect(page.getByTestId('chatter')).toHaveText('賤話：關');
-  await page.getByTestId('chatter').click();
-  await expect(page.getByTestId('chatter')).toHaveText('賤話：開');
+  await expect(page.getByTestId('chatter')).toHaveCount(0);
+  await expect(page.getByTestId('skip-taunt')).toHaveCount(0);
   const b = bt(page);
-  // 等戰鬥中真的說出賤話（泡泡可見）
-  await page.waitForFunction(() => (window as unknown as { __bt: { battle: { debugState(): { bubble: string; phase: string } } } }).__bt.battle.debugState().bubble === '賤話一號', null, { timeout: 40_000 });
-  const before = (await b.battle()).score;
-  // 泡泡還在時立刻靠近甩巴掌
-  await page.evaluate(() => {
-    const c = (window as unknown as { __bt: { battle: { puppet: { x: number }; debugSetPlayerX(x: number): void; pressSlot(i: number): void } } }).__bt.battle;
-    c.debugSetPlayerX(c.puppet.x - 2.2);
-    c.pressSlot(4);
-  });
-  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(before + 15 + 5);
-  await expect(page.locator('.shatter')).toHaveCount(0, { timeout: 5000 });
+  expect((await b.battle()).bubble).toBe('');
+  await b.setPlayerX((await b.battle()).puppetX - 2.2);
+  await page.keyboard.press('1');
+  await expect.poll(async () => (await b.battle()).bubble, { timeout: 10_000 }).toBe('不是你的錯');
 });
 
 test('再打爆一次：分數歸零、計時速度不變、無殘留；連續第 3 次出現一次休息提示', async ({ page }) => {

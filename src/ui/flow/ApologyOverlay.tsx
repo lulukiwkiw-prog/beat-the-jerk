@@ -11,7 +11,7 @@ import { fillPronouns } from '../../state/text';
 export function ApologyOverlay({ startDelay, onDone }: { startDelay: number; onDone: () => void }) {
   const s = useSession();
   const paras = useMemo(
-    () => buildApology({ self: s.self, other: s.other, a: s.a, b: s.b, feelings: s.feelings, d: filledD(s) }),
+    () => buildApology({ self: s.self, other: s.other, a: s.a, feelings: s.feelings, d: filledD(s) }),
     // 道歉稿只在進入時產生一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],

@@ -16,7 +16,7 @@ import { buildPlayer, PLAYER_HEAD_RADIUS } from '../player/playerModel';
 
 /** 玩家頭頂高度：軀幹底 1.75＋頸部 1.36＋球頭直徑 */
 const PLAYER_TOP = 1.75 + 1.36 + PLAYER_HEAD_RADIUS * 2;
-import { APOLOGY, DIALOGUE } from '../../config/dialogue.config';
+import { APOLOGY } from '../../config/dialogue.config';
 import { DialogueBubble } from '../dialogue/bubble';
 import { DialogueDirector, type DialogueEvent } from '../dialogue/director';
 import { ForgiveFx, LeaveFx } from '../ending/endingFx';
@@ -38,13 +38,11 @@ const BIG_HITS = new Set<MoveId>(['uppercut', 'shoe', 'stomp', 'spin', 'flykick'
 /** 收尾時間背景轉暖的目標色 */
 const WARM_BACKGROUND = '#EFD9C2';
 
-export type BattlePhase = 'taunt' | 'countdown' | 'fight' | 'ended' | 'apology' | 'worthy' | 'ending';
+export type BattlePhase = 'countdown' | 'fight' | 'ended' | 'apology' | 'worthy' | 'ending';
 /** 結局演出：1 原諒、2 到此為止、5 還沒準備好 */
 export type EndingShow = 'forgive' | 'leave' | 'later';
 
 export interface BattleScript {
-  /** 開場挑釁與「賤話：開」用的 B（已啟用） */
-  taunts: string[];
   /** 被打中時說的 D */
   dLines: string[];
 }
@@ -72,7 +70,6 @@ export interface HudState {
   cooldowns: Partial<Record<MoveId, number>>;
   countdown: string;
   paused: boolean;
-  chatter: boolean;
 }
 
 export interface BattleEvents {
@@ -125,7 +122,6 @@ export class BattleController {
   private bgWarm = new Color(WARM_BACKGROUND);
   private director: DialogueDirector;
   private bubble: DialogueBubble;
-  chatter = false;
   private hits = 0;
   private early = false;
   private showT = 0;
@@ -142,10 +138,10 @@ export class BattleController {
     private readonly paint: PaintStore,
     private readonly roundLength: number,
     private readonly ev: BattleEvents,
-    private readonly script: BattleScript = { taunts: [], dLines: [] },
+    private readonly script: BattleScript = { dLines: [] },
   ) {
-    this.director = new DialogueDirector(script.taunts, script.dLines);
-    this.bubble = new DialogueBubble(dom.bubble, dom.fx);
+    this.director = new DialogueDirector(script.dLines);
+    this.bubble = new DialogueBubble(dom.bubble);
     this.host = new SceneHost(dom.stage, ARENA_BACKGROUND, 11, CAMERA.fov);
     this.host.scene.fog = new Fog(ARENA_BACKGROUND, 30, 60);
     this.host.scene.add(buildArena());
@@ -200,40 +196,15 @@ export class BattleController {
     this.early = false;
     this.clearShow();
     this.bubble.hide();
-    // 開場挑釁：倒數前依序說出啟用的 B
-    this.phase = 'taunt';
-    this.director = new DialogueDirector(this.script.taunts, this.script.dLines);
-    this.handleDialogue(this.director.startTaunt(this.gameTime));
+    this.director = new DialogueDirector(this.script.dLines);
     this.emitHud(true);
-  }
-
-  /** 「賤話：開／關」 */
-  setChatter(on: boolean) {
-    this.chatter = on;
-    this.emitHud(true);
-  }
-
-  /** 略過開場挑釁 */
-  skipTaunt() {
-    this.handleDialogue(this.director.skipTaunt());
   }
 
   private handleDialogue(events: DialogueEvent[]) {
     for (const e of events) {
-      if (e.type === 'show') this.bubble.show(e.text, e.kind);
+      if (e.type === 'show') this.bubble.show(e.text);
       else if (e.type === 'shake') this.bubble.shake();
-      else if (e.type === 'hide') this.bubble.hide();
-      else if (e.type === 'shatter') {
-        this.bubble.shatter(prefersReducedMotion());
-        if (e.bonus) {
-          this.ledger.bonus(DIALOGUE.shatterBonus);
-          const hy = this.puppet.lift + headCenterY() + 1.2;
-          this.words.add(`+${DIALOGUE.shatterBonus} 打碎！`, this.puppet.x, hy, '#FFC63A', 0.85, 'score');
-        }
-      } else if (e.type === 'tauntDone' && this.phase === 'taunt') {
-        this.phase = 'countdown';
-        this.phaseTime = 0;
-      }
+      else this.bubble.hide();
     }
   }
 
@@ -292,7 +263,7 @@ export class BattleController {
       this.updateShow(dt);
       return;
     }
-    this.handleDialogue(this.director.update(this.gameTime, this.chatter, this.live, dt));
+    this.handleDialogue(this.director.update(this.gameTime));
     if (this.phase === 'countdown') {
       if (this.phaseTime >= ROUND.countdown) {
         this.phase = 'fight';
@@ -726,7 +697,6 @@ export class BattleController {
       cooldowns: cds,
       countdown: cd,
       paused: this.paused,
-      chatter: this.chatter,
     };
     const key = JSON.stringify(h);
     if (force || key !== this.lastHud) {
