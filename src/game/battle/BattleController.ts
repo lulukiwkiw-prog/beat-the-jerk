@@ -28,6 +28,7 @@ import { headCenterY, PART_DEFS } from '../puppet/parts';
 import { ScoreLedger, type ScoreLine } from '../scoring/ScoreLedger';
 import { ARENA_BACKGROUND, buildArena } from '../three/arena';
 import { computeFrame } from '../three/camera';
+import { srgb } from '../three/color';
 import { projectToScreen } from '../three/project';
 import { SceneHost } from '../three/sceneHost';
 
@@ -38,6 +39,8 @@ const BIG_HITS = new Set<MoveId>(['uppercut', 'shoe', 'stomp', 'spin', 'flykick'
 
 /** 收尾時間背景轉暖的目標色 */
 const WARM_BACKGROUND = '#EFD9C2';
+/** 放大絕招時的深藍夜色背景 */
+const FINISHER_BACKGROUND = '#121A44';
 
 export type BattlePhase = 'ask' | 'finisher' | 'countdown' | 'fight' | 'ended' | 'apology' | 'worthy' | 'ending';
 /** 結局演出：1 原諒、2 到此為止、5 還沒準備好 */
@@ -117,7 +120,7 @@ export class BattleController {
   /** 已經問過致命一擊的回合長度（每次延長後在剩 15 秒時再問一次） */
   private askedLen = 0;
   /** 致命一擊演出：已觸發到第幾個節點、目前鏡頭、對手所在方向、連打計數 */
-  private fin = { step: 0, shot: -1, side: 1 as 1 | -1, aura: 0, koAt: -1 };
+  private fin = { step: 0, shot: -1, side: 1 as 1 | -1, aura: 0, koAt: -1, koT: -1 };
   private beam: EnergyBeam | null = null;
   private camCut = false;
   private shake = 0;
@@ -128,6 +131,10 @@ export class BattleController {
   private disposed = false;
   private bgCool = new Color(ARENA_BACKGROUND);
   private bgWarm = new Color(WARM_BACKGROUND);
+  private bgDark = new Color(FINISHER_BACKGROUND);
+  /** 環境光原色與絕招時的夜色 */
+  private hemiBase = srgb('#FFFFFF');
+  private hemiNight = srgb('#2A3C9C');
   private director: DialogueDirector;
   private bubble: DialogueBubble;
   private hits = 0;
@@ -572,7 +579,7 @@ export class BattleController {
     p.vx = 0;
     this.beam?.dispose();
     this.beam = new EnergyBeam(this.host.scene);
-    this.fin = { step: 0, shot: -1, side, aura: 0, koAt: -1 };
+    this.fin = { step: 0, shot: -1, side, aura: 0, koAt: -1, koT: -1 };
     this.emitHud(true);
   }
 
@@ -640,11 +647,24 @@ export class BattleController {
     if (fin.step === 5 && fin.koAt < 0) fin.koAt = t + 0.35;
     if (fin.step >= 4 && fin.step < 6 && ((fin.koAt >= 0 && t >= fin.koAt) || t >= F.koLatest)) {
       fin.step = 6;
+      fin.koT = t;
       this.ledger.bonus(F.score);
       this.words.add(`+${F.score} 致命一擊`, p.x * 0.3, 6, '#FFC63A', 1.1, 'score');
       for (let i = 0; i < 4; i++) this.particles.burst(new Vector3(p.x + (Math.random() - 0.5) * 3, 1 + Math.random() * 3, 0.6), 'star', 8);
       this.kick(1);
     }
+
+    // 放大絕招時整個場景變暗（深藍夜色），只留主光打在兩人身上，光波更亮眼；K.O. 後慢慢亮回來
+    const dark = fin.koT < 0 ? smooth(t / F.darkIn) : 1 - smooth((t - fin.koT) / F.darkOut);
+    this.setWarmth(0);
+    const bg = this.host.scene.background as Color;
+    bg.lerp(this.bgDark, dark * F.darkAmount);
+    (this.host.scene.fog as Fog).color.copy(bg);
+    const L = this.host.lights;
+    L.hemi.color.copy(this.hemiBase).lerp(this.hemiNight, dark);
+    L.hemi.intensity *= 1 - 0.55 * dark;
+    L.fill.intensity *= 1 - 0.85 * dark;
+    L.key.intensity *= 1 - 0.4 * dark;
 
     // 運鏡：每個鏡頭切一次（cut），鏡頭內平滑推移
     const shot = t < F.fire ? 0 : t < F.hit + 0.25 ? 1 : fin.step < 5 ? 2 : t < (fin.koAt < 0 ? F.koLatest : fin.koAt) + 0.8 ? 3 : 4;
@@ -713,6 +733,7 @@ export class BattleController {
     this.beam = null;
     this.player.rig.root.position.z = 0;
     this.host.lights.hemi.visible = this.host.lights.key.visible = this.host.lights.fill.visible = true;
+    this.host.lights.hemi.color.copy(this.hemiBase);
   }
 
   /** 道歉轉場：停止攻擊與 AI、清掉殘留物，積木人走回中央單膝跪地，燈光轉暖、鏡頭推近。 */

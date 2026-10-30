@@ -51,6 +51,10 @@ export const FINISHER = {
   beamRadius: 0.95,
   /** 摔回地面後幾秒顯示 K.O.（若沒摔到，最晚這個時間） */
   koLatest: 4.9,
+  /** 背景變暗：幾秒內暗下來、K.O. 後幾秒亮回來、最暗程度（0～1） */
+  darkIn: 0.6,
+  darkOut: 1.4,
+  darkAmount: 1,
   /** 終結技加分 */
   score: 100,
 } as const;
