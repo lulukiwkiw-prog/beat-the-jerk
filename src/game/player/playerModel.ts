@@ -1,11 +1,16 @@
-import { CanvasTexture, CylinderGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, SRGBColorSpace, TorusGeometry, type Object3D } from 'three';
+import { CanvasTexture, CylinderGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, SRGBColorSpace, type Object3D } from 'three';
 import { plastic } from '../three/color';
 import { srgb } from '../three/color';
 import { cachedRoundedBox } from '../three/geometry';
 
+/** 玩家球形頭半徑（原 0.62 的 1.5 倍） */
+export const PLAYER_HEAD_RADIUS = 0.93;
+
 export const PLAYER_COLORS = {
-  suit: '#24408E',
-  trim: '#F4F1EA',
+  /** 上半身米白、下半身馬卡龍藍 */
+  top: '#F4F0E6',
+  bottom: '#A9CBEA',
+  trim: '#8DB4DD',
   skin: '#F2D29B',
   red: '#D8322A',
   dark: '#1D2740',
@@ -66,7 +71,7 @@ function justiceFaceMaterial(): MeshStandardMaterial {
   return (faceMat = new MeshStandardMaterial({ map: tex, roughness: 0.32, metalness: 0 }));
 }
 
-/** 玩家角色：深藍運動服、白色腰線、紅色拳套與頭帶；球形頭、正義臉。 */
+/** 玩家角色：上半身米白、下半身馬卡龍藍、紅色拳套；球形大頭、正義臉。 */
 export function buildPlayer(shadows = true): PlayerRig {
   const C = PLAYER_COLORS;
   const root = new Group();
@@ -86,30 +91,24 @@ export function buildPlayer(shadows = true): PlayerRig {
     const leg = new Group();
     leg.position.set(s * 0.34, 1.75, 0);
     body.add(leg);
-    box(0.62, 1.5, 0.68, 0.12, C.suit, leg, 0, -0.78);
+    box(0.62, 1.5, 0.68, 0.12, C.bottom, leg, 0, -0.78);
     box(0.66, 0.26, 0.98, 0.1, C.dark, leg, 0, -1.6, 0.12);
     legs.push(leg);
   }
   const torso = new Group();
   torso.position.y = 1.75;
   body.add(torso);
-  box(1.4, 1.36, 0.88, 0.16, C.suit, torso, 0, 0.68);
+  box(1.4, 1.36, 0.88, 0.16, C.top, torso, 0, 0.68);
   box(1.42, 0.14, 0.9, 0.05, C.trim, torso, 0, 0.08);
-  // 球形頭＋正義臉 (・`_´・)，紅頭帶繞一圈
+  // 球形大頭＋正義臉 (・`_´・)
   const neck = new Mesh(new CylinderGeometry(0.26, 0.28, 0.2, 18), plastic(C.skin));
   neck.position.y = 1.44;
   torso.add(neck);
-  const head = new Mesh(new SphereGeometry(0.62, 36, 24), justiceFaceMaterial());
-  head.position.set(0, 1.98, 0);
+  const R = PLAYER_HEAD_RADIUS;
+  const head = new Mesh(new SphereGeometry(R, 40, 28), justiceFaceMaterial());
+  head.position.set(0, 1.36 + R, 0);
   head.castShadow = shadows;
   torso.add(head);
-  const band = new Mesh(new TorusGeometry(0.6, 0.07, 10, 36), plastic(C.red));
-  band.rotation.x = Math.PI / 2 - 0.12;
-  band.position.y = 0.22;
-  band.castShadow = shadows;
-  head.add(band);
-  const tail = box(0.14, 0.42, 0.12, 0.05, C.red, head, 0, 0.12, -0.62);
-  tail.rotation.x = 0.6;
   const arms: Group[] = [];
   const elbows: Group[] = [];
   const gloves: Mesh[] = [];
@@ -117,7 +116,7 @@ export function buildPlayer(shadows = true): PlayerRig {
     const sh = new Group();
     sh.position.set(s * 0.92, 1.18, 0);
     torso.add(sh);
-    box(0.44, 0.72, 0.44, 0.12, C.suit, sh, 0, -0.35);
+    box(0.44, 0.72, 0.44, 0.12, C.top, sh, 0, -0.35);
     const el = new Group();
     el.position.y = -0.7;
     sh.add(el);

@@ -12,7 +12,10 @@ import { BattleInput } from '../engine/input';
 import { RoundClock } from '../engine/roundClock';
 import { attackFinished, hitIdOf, inMeleeRange, stepAttack, type ActiveAttack } from '../moves/attack';
 import { Player } from '../player/Player';
-import { buildPlayer } from '../player/playerModel';
+import { buildPlayer, PLAYER_HEAD_RADIUS } from '../player/playerModel';
+
+/** 玩家頭頂高度：軀幹底 1.75＋頸部 1.36＋球頭直徑 */
+const PLAYER_TOP = 1.75 + 1.36 + PLAYER_HEAD_RADIUS * 2;
 import { ShoeProjectiles } from '../projectiles/shoes';
 import type { PaintStore } from '../puppet/paintSurface';
 import { Puppet, type PuppetEvent } from '../puppet/Puppet';
@@ -386,7 +389,7 @@ export class BattleController {
       aspect: this.host.camera.aspect,
       fov: this.host.camera.fov,
       actors: [
-        { x: pl.x, halfWidth: 0.9, top: PUPPET.height + 0.2 + 0.8 },
+        { x: pl.x, halfWidth: 1.0, top: PLAYER_TOP + 0.3 },
         { x: p.x, halfWidth: PUPPET.halfWidth + (p.airborne ? 0.6 : 0), top: p.lift + PUPPET.height },
       ],
     });
