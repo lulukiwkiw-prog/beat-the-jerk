@@ -437,9 +437,9 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
   .pad-left { grid-area: left; align-self: end; grid-template-columns: 1fr 1fr; }
   .pad-left [aria-label='閃避'] { grid-column: 1 / -1; order: 3; }
   .pad-right { grid-area: right; align-self: end; }
-  .moves { grid-template-columns: 1fr; gap: 6px; }
+  .moves, .moves[data-count='4'] { grid-template-columns: 1fr 1fr; gap: 6px; }
   .ctl { height: 54px; }
-  .mv { height: 52px; }
+  .mv { height: 50px; font-size: 13px; }
   .keys { display: none; }
 }
 

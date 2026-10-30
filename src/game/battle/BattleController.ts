@@ -1,7 +1,7 @@
 import { Color, Fog, Vector3 } from 'three';
 import { CAMERA, GAME } from '../../config/game.config';
 import { EFFECTS } from '../../config/effects.config';
-import { H, MOVE_SETS, MOVES, PLAYER, type MeleeMove, type MoveId, type MoveKind, type ThrowMove } from '../../config/moves.config';
+import { H, MOVE_SETS, MOVES, PLAYER, type DashMove, type MeleeMove, type MoveId, type MoveKind, type ThrowMove } from '../../config/moves.config';
 import { PUPPET } from '../../config/puppet.config';
 import { EASY_AI, ROUND } from '../../config/round.config';
 import { prefersReducedMotion, settingsStore, vibrate } from '../../state/settings';
@@ -20,7 +20,7 @@ import { APOLOGY, DIALOGUE } from '../../config/dialogue.config';
 import { DialogueBubble } from '../dialogue/bubble';
 import { DialogueDirector, type DialogueEvent } from '../dialogue/director';
 import { ForgiveFx, LeaveFx } from '../ending/endingFx';
-import { ShoeProjectiles } from '../projectiles/shoes';
+import { Projectiles } from '../projectiles/projectiles';
 import type { PaintStore } from '../puppet/paintSurface';
 import { Puppet, type PuppetEvent } from '../puppet/Puppet';
 import { headCenterY, PART_DEFS } from '../puppet/parts';
@@ -29,6 +29,11 @@ import { ARENA_BACKGROUND, buildArena } from '../three/arena';
 import { computeFrame } from '../three/camera';
 import { projectToScreen } from '../three/project';
 import { SceneHost } from '../three/sceneHost';
+
+/** 各近戰招式命中點的高度（離木偶腳底） */
+const HIT_Y: Partial<Record<MoveId, number>> = { slap: 4.1, stomp: 1.4, hammer: 4.6, spin: 2.8, club: 3.8 };
+/** 大招：特效與鏡頭晃動較大 */
+const BIG_HITS = new Set<MoveId>(['uppercut', 'shoe', 'stomp', 'spin', 'flykick', 'bucket', 'chair', 'hammer']);
 
 /** 收尾時間背景轉暖的目標色 */
 const WARM_BACKGROUND = '#EFD9C2';
@@ -97,7 +102,7 @@ export class BattleController {
   readonly input: BattleInput;
   private particles: Particles;
   private words: ComicWords;
-  private shoes: ShoeProjectiles;
+  private shoes: Projectiles;
   private ai = new EasyAI();
   ledger = new ScoreLedger();
   clock: RoundClock;
@@ -152,7 +157,7 @@ export class BattleController {
     this.player = new Player(rig);
     this.particles = new Particles(this.host.scene);
     this.words = new ComicWords(dom.fx);
-    this.shoes = new ShoeProjectiles(this.host.scene);
+    this.shoes = new Projectiles(this.host.scene);
     this.input = new BattleInput(() => this.ev.onRequestPause());
     this.clock = new RoundClock(roundLength);
     document.addEventListener('visibilitychange', this.onVis);
@@ -315,7 +320,7 @@ export class BattleController {
       else if (a.type === 'dodge') this.player.tryDodge();
       else if (a.type === 'move') {
         const id = MOVE_SETS[this.kind][a.slot];
-        if (id) this.player.tryAttack(id, ++this.seq);
+        if (id) this.onAttackStart(this.player.tryAttack(id, ++this.seq));
       }
     }
 
@@ -328,23 +333,28 @@ export class BattleController {
       for (const e of stepAttack(att, dt)) {
         if (!this.live) continue;
         if (e.kind === 'check') this.meleeCheck(att, e.segment);
-        else this.shoes.throw(att.move as ThrowMove, pl.x, att.facing, hitIdOf(this.round, att.seq, 0));
+        else if (e.kind === 'dash') this.dashCheck(att);
+        else if (e.kind === 'dashEnd') {
+          if (!att.landed) this.words.add('揮空', pl.x + att.facing * 1.6, 3.6, '#C9D2F2', 0.55);
+        } else this.shoes.throw(att.move as ThrowMove, pl.x, att.facing, hitIdOf(this.round, att.seq, 0), p.x);
       }
       if (attackFinished(att)) {
         pl.attack = null;
         const next = pl.takeBuffered();
-        if (next && this.live) pl.tryAttack(next, ++this.seq);
+        if (next && this.live) this.onAttackStart(pl.tryAttack(next, ++this.seq));
       }
     }
 
     const hits = this.shoes.update(dt, { x: p.x, halfWidth: PUPPET.halfWidth, bottom: p.lift, top: p.lift + H, active: this.live && !p.invulnerable });
-    for (const h of hits) this.applyHit('shoe', h.hitId, 0, new Vector3(h.x, h.y, 0.6));
+    for (const h of hits) this.applyHit(h.id, h.hitId, 0, new Vector3(h.x, h.y, 0.6));
 
     // 木偶 AI（簡單模式）
     const side = (Math.sign(pl.x - p.x) || -1) as -1 | 1;
     // 面對面：木偶轉身朝向玩家，擺出前後腳站姿
     if (!p.airborne) p.setStance(true, side);
-    for (const e of this.ai.update(dt, this.live && !p.invulnerable && !p.airborne && !p.isDown, side)) {
+    // 暈眩（水桶套頭）、手風琴、壓扁中不出拳
+    const canAct = !p.invulnerable && !p.airborne && !p.isDown && !p.isStunned && !p.isAccordion && !p.isFlat;
+    for (const e of this.ai.update(dt, this.live && canAct, side)) {
       if (e.type === 'windup') {
         p.setAiPose('windup', e.side);
         this.dom.alert.hidden = false;
@@ -359,12 +369,26 @@ export class BattleController {
     }
 
     for (const e of p.update(dt, { walls: [GAME.wallL, GAME.wallR], reducedMotion: prefersReducedMotion() })) this.onPuppetEvent(e);
+    this.blockPuppet();
     this.ledger.tick(this.clock.elapsed());
     this.particles.update(dt);
     this.words.update(dt);
     this.shake = Math.max(0, this.shake - dt * CAMERA.shakeDecay);
     this.flash = Math.max(0, this.flash - dt * EFFECTS.flashDecay);
     this.emitHud(false);
+  }
+
+  /** 木偶被打飛、撞牆彈回時不會穿過玩家：碰到就停在玩家面前並稍微反彈。 */
+  private blockPuppet() {
+    const p = this.puppet;
+    const pl = this.player;
+    if (p.airborne || p.invulnerable || pl.attack?.move.id === 'stomp') return;
+    const toPlayer = Math.sign(pl.x - p.x) || 1;
+    const gap = Math.abs(pl.x - p.x) - (PLAYER.halfWidth + PUPPET.halfWidth);
+    if (gap < 0 && p.vx * toPlayer > 0) {
+      p.x = pl.x - toPlayer * (PLAYER.halfWidth + PUPPET.halfWidth);
+      p.vx = -p.vx * 0.3;
+    }
   }
 
   private meleeCheck(att: ActiveAttack, segment: number) {
@@ -380,8 +404,30 @@ export class BattleController {
       if (segment === 0) this.words.add('揮空', pl.x + att.facing * 1.6, 3.6, '#C9D2F2', 0.55);
       return;
     }
-    const at = new Vector3(p.x - att.facing * 0.4, p.lift + (m.id === 'slap' ? 4.1 : m.id === 'stomp' ? 1.4 : 3.2), 0.6);
+    const at = new Vector3(p.x - att.facing * 0.4, p.lift + (HIT_Y[m.id] ?? 3.2), 0.6);
     this.applyHit(m.id, hitIdOf(this.round, att.seq, segment), segment, at);
+  }
+
+  /** 招式開始時的提示（鐵錘蓄力） */
+  private onAttackStart(att: ActiveAttack | null) {
+    if (att?.move.id === 'hammer') this.words.add('蓄力…', this.player.x, 5.7, '#FFC63A', 0.8);
+  }
+
+  /**
+   * 飛踢突進：每一步都檢查是否撞到木偶。整段突進只有一個 hitId，
+   * 撞到後即使下一步還在範圍內，帳本也只會結算一次。
+   */
+  private dashCheck(att: ActiveAttack) {
+    const m = att.move as DashMove;
+    const p = this.puppet;
+    const pl = this.player;
+    const reach = inMeleeRange({
+      playerX: pl.x, facing: att.facing, targetX: p.x, playerHalf: PLAYER.halfWidth, targetHalf: PUPPET.halfWidth,
+      range: m.range, backRange: 0, H,
+    });
+    if (!reach || p.lift > m.maxTargetLift * H || p.invulnerable) return;
+    att.landed = true;
+    this.applyHit(m.id, hitIdOf(this.round, att.seq, 0), 0, new Vector3(p.x - att.facing * 0.5, p.lift + 2.6, 0.6));
   }
 
   /** 命中結算：同一 hitId 只算一次（帳本把關），之後才做反應與特效。 */
@@ -395,25 +441,31 @@ export class BattleController {
     if (!res.scored) return;
 
     if (id === 'jab') p.punch(dir, segment);
+    else if (id === 'spin') p.spinKick(dir);
     else if (id === 'uppercut') p.launch(dir);
+    else if (id === 'flykick') p.flyKicked(dir);
     else if (id === 'slap') p.slap(dir);
-    else if (id === 'shoe') p.shoeHit(dir);
     else if (id === 'stomp') p.flatten();
+    else if (id === 'club') p.clubHit(dir, segment);
+    else if (id === 'bucket') p.bucketHit(dir);
+    else if (id === 'chair') p.chairHit(dir);
+    else if (id === 'shoe') p.shoeHit(dir);
+    else if (id === 'hammer') p.hammerHit();
     this.ai.interrupt();
     p.setAiPose('idle', dir);
     this.dom.alert.hidden = true;
     this.hits++;
     this.handleDialogue(this.director.onHit(this.gameTime));
 
-    const big = id === 'uppercut' || id === 'shoe' || id === 'stomp';
+    const big = BIG_HITS.has(id) || (id === 'club' && segment === 2);
     const s = this.fxScale();
     this.particles.burst(at, 'star', Math.round((big ? 6 : 3) * s));
     this.particles.burst(at, 'chip', Math.round((big ? 10 : 5) * s));
     this.words.add(m.words[segment % m.words.length], at.x, at.y + 0.6, '#E8392B', 1);
     this.kick((big ? 0.9 : 0.4) * s);
     this.showScore(res.lines, at);
-    // 連擊達 10 的倍數：木偶在地面上時噴飛
-    if (res.comboMilestone && !p.airborne) p.explode(0.8, prefersReducedMotion());
+    // 連擊達 10 的倍數：木偶在地面上時噴飛（鐵錘本來就會在手風琴後噴飛）
+    if (res.comboMilestone && !p.airborne && id !== 'hammer') p.explode(0.8, prefersReducedMotion());
   }
 
   private showScore(lines: ScoreLine[], at: Vector3) {
@@ -479,6 +531,7 @@ export class BattleController {
     this.player.attack = null;
     this.shoes.clear();
     this.puppet.forceReassemble();
+    this.puppet.clearStatus();
     this.puppet.setAiPose('idle', -1);
     this.dom.alert.hidden = true;
     if (banner) this.ev.onBanner('時間到！');
@@ -512,6 +565,7 @@ export class BattleController {
     this.ai.reset();
     const p = this.puppet;
     p.forceReassemble();
+    p.clearStatus();
     p.setAiPose('idle', -1);
     p.setStance(false);
     this.walkFrom = { puppet: p.x, player: this.player.x };
@@ -704,6 +758,9 @@ export class BattleController {
       hits: this.hits,
       showT: this.showT,
       flat: this.puppet.isFlat,
+      stunned: this.puppet.isStunned,
+      bucket: this.puppet.hasBucket,
+      accordion: this.puppet.isAccordion,
     };
   }
 

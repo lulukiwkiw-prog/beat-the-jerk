@@ -165,7 +165,7 @@ test('賤話預設關；打開後木偶說 B，打中時碎成星星並 +5', asy
   await page.evaluate(() => {
     const c = (window as unknown as { __bt: { battle: { puppet: { x: number }; debugSetPlayerX(x: number): void; pressSlot(i: number): void } } }).__bt.battle;
     c.debugSetPlayerX(c.puppet.x - 2.2);
-    c.pressSlot(2);
+    c.pressSlot(4);
   });
   await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(before + 15 + 5);
   await expect(page.locator('.shatter')).toHaveCount(0, { timeout: 5000 });

@@ -84,7 +84,7 @@ export class BattleInput {
       if (!e.repeat) this.push({ type: 'dodge' });
     } else if (k === 'q' || k === 'Q') {
       if (!e.repeat) this.push({ type: 'toggleKind' });
-    } else if (/^[1-5]$/.test(k)) {
+    } else if (/^[1-6]$/.test(k)) {
       if (!e.repeat) this.push({ type: 'move', slot: Number(k) - 1 });
     }
   };

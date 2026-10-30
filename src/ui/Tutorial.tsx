@@ -21,12 +21,12 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
           <h3>電腦</h3>
           <ul>
             <li><kbd>A</kbd> <kbd>D</kbd> 或 <kbd>←</kbd> <kbd>→</kbd> 移動</li>
-            <li><kbd>1</kbd>～<kbd>5</kbd> 出招，<kbd>Q</kbd> 切換徒手／武器</li>
+            <li><kbd>1</kbd>～<kbd>6</kbd> 出招（武器 1～5），<kbd>Q</kbd> 切換徒手／武器</li>
             <li><kbd>空白</kbd> 閃避，<kbd>Esc</kbd> 暫停</li>
           </ul>
         </div>
       </div>
-      <p className="note">上勾拳把它打上天，落地會散成一地積木再自己組回來；連擊每 10 下也會散一次。</p>
+      <p className="note">上勾拳把它打上天，落地會散成一地積木再自己組回來；鐵錘敲頭、連擊每 10 下也會散一次。鐵錘要先蓄力，看到「蓄力…」再等一下。</p>
       <button type="button" className="btn primary" onClick={onClose}>
         知道了
       </button>

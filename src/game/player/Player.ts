@@ -1,9 +1,12 @@
 import { GAME } from '../../config/game.config';
-import { MOVES, PLAYER, type MoveId } from '../../config/moves.config';
-import { startAttack, type ActiveAttack } from '../moves/attack';
+import { H, MOVES, PLAYER, type MoveId } from '../../config/moves.config';
+import { PUPPET } from '../../config/puppet.config';
+import { dashProgress, startAttack, type ActiveAttack } from '../moves/attack';
 import type { PlayerRig } from './playerModel';
-import { buildShoe } from '../projectiles/shoeModel';
-import type { Group } from 'three';
+import { buildBucket, buildChair, buildClub, buildHammer, buildShoe } from '../projectiles/weaponModels';
+import type { Group, Object3D } from 'three';
+
+type Held = 'shoe' | 'club' | 'hammer' | 'bucket' | 'chair';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const smooth = (t: number) => {
@@ -24,15 +27,29 @@ export class Player {
   private hop = 0;
   private bob = 0;
   private bodyYaw = 0.85;
-  private heldShoe: Group;
+  private held: Record<Held, Group>;
   /** 結局演出時由劇本控制：朝向（弧度）、走路擺腿、坐下 */
   script: { yaw: number; walking: boolean; sit: boolean } | null = null;
 
   constructor(readonly rig: PlayerRig) {
-    this.heldShoe = buildShoe();
-    this.heldShoe.visible = false;
-    this.heldShoe.position.set(0, -0.75, 0);
-    rig.elR.add(this.heldShoe);
+    // 拿在右手的武器（平常隱藏，出招時才出現）
+    const at = (o: Group, parent: Object3D, x: number, y: number, z: number) => {
+      o.visible = false;
+      o.position.set(x, y, z);
+      parent.add(o);
+      return o;
+    };
+    const chair = at(buildChair(), rig.elR, -0.45, -1.15, 0);
+    chair.rotation.set(Math.PI / 2, 0, 0);
+    const bucket = at(buildBucket(), rig.elR, 0, -1.05, 0);
+    bucket.scale.setScalar(0.85);
+    this.held = {
+      shoe: at(buildShoe(), rig.elR, 0, -0.75, 0),
+      club: at(buildClub(), rig.elR, 0, -0.6, 0),
+      hammer: at(buildHammer(), rig.elR, 0, -0.6, 0),
+      bucket,
+      chair,
+    };
   }
 
   reset() {
@@ -111,6 +128,17 @@ export class Player {
     if (this.dodge <= 0 && this.stun <= 0) this.vx = want * PLAYER.speed;
     else this.vx *= Math.pow(0.02, dt);
     this.x = Math.max(GAME.playerMinX, Math.min(GAME.playerMaxX, this.x + this.vx * dt));
+    const a = this.attack;
+    if (a && a.move.type === 'dash' && !a.landed) {
+      // 飛踢突進：往面向衝，撞到木偶就停在它前面
+      const m = a.move;
+      const p0 = dashProgress(a);
+      const p1 = Math.max(0, Math.min(1, (a.t + dt - m.windup) / m.dashTime));
+      const stopAt = targetX - a.facing * (PLAYER.halfWidth + PUPPET.halfWidth);
+      let nx = this.x + a.facing * (p1 - p0) * m.dashDist * H;
+      if ((stopAt - nx) * a.facing < 0) nx = (stopAt - this.x) * a.facing > 0 ? stopAt : this.x;
+      this.x = Math.max(GAME.playerMinX, Math.min(GAME.playerMaxX, nx));
+    }
     // 自動面朝木偶（出招中保持方向）
     if (!this.attack) {
       const d = Math.sign(targetX - this.x);
@@ -146,6 +174,25 @@ export class Player {
       yawRate = 40;
       const elev = Math.atan2(dy, Math.max(0.2, reachX));
       slap = { arm: this.facing > 0 ? 'L' : 'R', shX: -(Math.PI / 2 + elev) * Math.min(1, inOut * 1.5) };
+    }
+    let spinLeg = 0;
+    let fly = 0;
+    if (a && a.move.id === 'spin') {
+      // 迴旋踢：身體轉一整圈，後腳往外掃
+      const S = PLAYER.spinAnim;
+      const u = smooth((a.t - S.start) / (S.end - S.start));
+      face = this.facing * (0.85 + u * Math.PI * 2);
+      yawRate = 60;
+      spinLeg = Math.sin(u * Math.PI) * S.legLift;
+    }
+    if (a && a.move.type === 'dash') {
+      // 飛踢：側身騰空、前腳踢直
+      const m = a.move;
+      const total = m.windup + m.dashTime;
+      fly = a.t < m.windup ? (a.t / m.windup) * 0.3 : a.t < total ? 1 : 1 - smooth((a.t - total) / Math.max(0.01, m.duration - total));
+      L.root.position.y += Math.sin(Math.min(1, fly) * Math.PI * 0.5) * PLAYER.flykickAnim.hop * (a.t < total ? 1 : 1 - smooth((a.t - total) / 0.2));
+      face = this.facing * (Math.PI / 2);
+      yawRate = 30;
     }
     if (this.script) face = this.script.yaw;
     let stomp: number | null = null;
@@ -205,6 +252,42 @@ export class Player {
         const p = Math.min(1, t / 0.12);
         A.shR = [lerp(1.0, -2.1, p), 0];
         A.elR = -0.3;
+      } else if (m.id === 'club' && m.type === 'melee') {
+        // 棍棒連打：每段從頭上往前敲，第 3 下舉更高、敲更用力
+        const seg = Math.min(m.hits - 1, Math.max(0, Math.floor((t - m.windup + m.interval * 0.6) / m.interval)));
+        const segStart = m.windup + seg * m.interval;
+        const k = smooth((t - (segStart - m.interval * 0.6)) / (m.interval * 0.6));
+        const top = seg === 2 ? -3.2 : -2.6;
+        A.shR = [lerp(top, -1.05, k), 0];
+        A.elR = lerp(-0.6, -0.1, k);
+        A.shL = [-1.0, 0];
+      } else if (m.id === 'hammer') {
+        // 鐵錘：蓄力時高舉過頭、微微發抖，判定瞬間往下敲
+        const H2 = PLAYER.hammerAnim;
+        if (t < m.windup) {
+          const k = smooth(t / 0.2);
+          const sh = Math.sin(t * 60) * H2.shake * Math.min(1, t / m.windup);
+          A.shR = [lerp(-0.6, -3.3, k) + sh, 0];
+          A.shL = [lerp(-0.5, -3.1, k) - sh, 0];
+          A.elR = A.elL = -0.25;
+        } else {
+          const k = smooth((t - m.windup) / 0.08);
+          A.shR = [lerp(-3.3, -0.9, k), 0];
+          A.shL = [lerp(-3.1, -1.0, k), 0];
+          A.elR = A.elL = -0.1;
+        }
+      } else if (m.id === 'bucket') {
+        // 由下往上拋
+        const p = smooth(t / m.windup);
+        A.shR = [lerp(0.9, -2.0, p), 0];
+        A.elR = lerp(-0.2, -0.4, p);
+      } else if (m.id === 'chair') {
+        // 雙手舉過頭再往前丟
+        const p = t < m.windup ? smooth(t / m.windup) : 1;
+        const thr = t < m.windup ? 0 : smooth((t - m.windup) / 0.12);
+        A.shR = [lerp(-1.2, -3.2, p) + thr * 1.4, 0.15];
+        A.shL = [lerp(-1.2, -3.2, p) + thr * 1.4, -0.15];
+        A.elR = A.elL = -0.3;
       }
     }
     if (this.stun > 0) {
@@ -219,6 +302,22 @@ export class Player {
     const st = step === 0 ? PLAYER.stance : { front: 0, back: 0 };
     L.legL.rotation.x = step + (frontR ? st.back : -st.front);
     L.legR.rotation.x = -step + (frontR ? -st.front : st.back);
+    L.legL.rotation.z = L.legR.rotation.z = 0;
+    if (spinLeg) {
+      // 後腳往外抬起，隨身體轉圈掃過
+      const back = frontR ? L.legL : L.legR;
+      back.rotation.z = (frontR ? -1 : 1) * spinLeg;
+      back.rotation.x = 0;
+    }
+    if (fly) {
+      // 前腳踢直、後腳縮起
+      const f = Math.min(1, fly);
+      const fl = frontR ? L.legR : L.legL;
+      const bl = frontR ? L.legL : L.legR;
+      fl.rotation.x = lerp(fl.rotation.x, -1.5, f);
+      bl.rotation.x = lerp(bl.rotation.x, 0.9, f);
+      L.body.rotation.z = -0.25 * f * this.facing;
+    }
     if (stomp !== null) {
       // 空中縮腿、落下時伸直往下踩
       const tuck = stomp < (a?.move.windup ?? 0) ? -0.9 : -0.1;
@@ -248,6 +347,18 @@ export class Player {
       const o = open && openArm === side;
       g.scale.set(o ? 0.5 : 1, o ? 1.35 : 1.05, o ? 1.2 : 1.1);
     }
-    this.heldShoe.visible = !!(a && a.move.id === 'shoe' && a.t < a.move.windup);
+    // 手上的武器：棍棒、鐵錘整招都拿著；投擲物出手後就不在手上
+    const id = a?.move.id;
+    const before = !!a && a.t < a.move.windup;
+    this.held.shoe.visible = id === 'shoe' && before;
+    this.held.bucket.visible = id === 'bucket' && before;
+    this.held.chair.visible = id === 'chair' && before;
+    this.held.club.visible = id === 'club';
+    this.held.hammer.visible = id === 'hammer';
+    if (id === 'hammer' && a) {
+      // 蓄力提示：錘頭越來越大
+      const head = this.held.hammer.userData.head as Object3D;
+      head.scale.setScalar(a.t < a.move.windup ? lerp(1, PLAYER.hammerAnim.grow, a.t / a.move.windup) : 1);
+    }
   }
 }

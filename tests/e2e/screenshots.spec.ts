@@ -6,7 +6,7 @@ const SIZES = [
   { name: 'mobile-landscape', width: 844, height: 390 },
   { name: 'desktop', width: 1440, height: 900 },
 ];
-const DIR = 'screenshots/stage-3';
+const DIR = 'screenshots/stage-4';
 
 for (const s of SIZES) {
   test(`截圖 ${s.name}`, async ({ page }) => {
@@ -41,6 +41,11 @@ for (const s of SIZES) {
     await page.keyboard.press('1');
     await expect(page.getByTestId('battle-bubble')).toBeVisible();
     await page.screenshot({ path: `${DIR}/${s.name}-04-fight.png` });
+    // 武器頁：丟水桶套頭
+    await page.keyboard.press('q');
+    await page.keyboard.press('2');
+    await expect.poll(async () => (await b.battle()).bucket, { timeout: 10_000 }).toBe(true);
+    await page.screenshot({ path: `${DIR}/${s.name}-04b-weapon.png` });
     await expect(page.getByTestId('apology')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText('關於你寫下的這件事：')).toBeVisible({ timeout: 30_000 });
     const all = page.getByTestId('apology-all');

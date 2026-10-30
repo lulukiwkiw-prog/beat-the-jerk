@@ -32,6 +32,18 @@ export const PUPPET = {
     /** 上勾拳：初速使最高點約 1.5H */
     launch: { vy: Math.sqrt(2 * 26 * 1.5 * H), spin: 6.5, push: 2, squashY: 8 },
     shoe: { push: 3, squashX: 6, squashY: -5, torso: 5, decalLife: 3 },
+    /** 迴旋踢：原地轉一圈（秒）並後退 distance（H） */
+    spinKick: { time: 0.5, distance: 1, squashY: -3 },
+    /** 飛踢：擊退 distance（H），撞牆回彈；倒地後起身 */
+    flyKick: { distance: 2, torso: 9, squashX: 6 },
+    /** 棍棒：前兩下輕敲，第 3 下強烈壓縮（高度比例、橫向比例） */
+    club: { light: { squashY: -5, headX: 8, push: 0.5 }, strong: { y: 0.5, x: 1.35, push: 1.2 } },
+    /** 水桶套頭：暈眩秒數、桶子大小（相對頭寬） */
+    bucket: { stun: 1.5, push: 0.6, scale: 1.18, wobble: 0.28 },
+    /** 桌椅：大力擊退與壓扁 */
+    chair: { push: 5, squashX: 9, squashY: -9, torso: 8 },
+    /** 鐵錘：壓成手風琴（高度比例、橫向比例、起伏）持續秒數，彈回後噴飛 */
+    hammer: { y: 0.42, x: 1.3, ripple: 0.09, rippleSpeed: 38, time: 0.5, bounce: 12 },
     /** 撞牆測試：擊退速度 */
     wallSmash: { push: 15, squashY: 6 },
     /** 踩扁：壓成一片（高度比例、橫向比例）持續秒數，之後彈回 */

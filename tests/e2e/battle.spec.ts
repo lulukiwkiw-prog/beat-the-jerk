@@ -32,7 +32,7 @@ test('命中得分、落空不得分、投射物碰撞、冷卻、暫停、時�
 
   // 落空：距離太遠，不得分、不計連擊
   await b.setPlayerX(-7);
-  await page.keyboard.press('3');
+  await page.keyboard.press('5');
   await expect(page.getByTestId('move-slap').locator('.cdt')).toBeVisible();
   await expect.poll(async () => (await b.battle()).attacking).toBe(false);
   expect((await b.battle()).score).toBe(0);
@@ -47,16 +47,16 @@ test('命中得分、落空不得分、投射物碰撞、冷卻、暫停、時�
 
   // 冷卻中顯示剩餘秒數
   await b.setPlayerX(-7);
-  await page.keyboard.press('2');
+  await page.keyboard.press('3');
   await expect(page.getByTestId('move-uppercut').locator('.cdt')).toBeVisible();
 
-  // 武器：Q 切換，武器頁只有一顆丟鞋子
+  // 武器：Q 切換，武器頁 5 招；4＝丟鞋子
   await page.keyboard.press('q');
   await expect(page.getByTestId('kind-weapon')).toHaveAttribute('aria-checked', 'true');
-  await expect(page.locator('.moves .mv')).toHaveCount(1);
+  await expect(page.locator('.moves .mv')).toHaveCount(5);
   await page.waitForTimeout(1100);
   const before = (await b.battle()).score;
-  await page.keyboard.press('1');
+  await page.keyboard.press('4');
   await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(before + 15);
   await expect.poll(async () => (await b.battle()).projectiles).toBe(0);
 
@@ -89,12 +89,12 @@ test('上勾拳把木偶打上天，重摔落地噴飛再組回；噴飛中攻�
   const b = bt(page);
   const s = await b.battle();
   await b.setPlayerX(s.puppetX - 2.0);
-  await page.keyboard.press('2');
+  await page.keyboard.press('3');
   await expect.poll(async () => (await b.battle()).puppetLift).toBeGreaterThan(3);
   await expect.poll(async () => (await b.battle()).scattered, { timeout: 15_000 }).toBe(true);
   const sc = (await b.battle()).score;
   await b.setPlayerX((await b.battle()).puppetX - 2.0);
-  await page.keyboard.press('3');
+  await page.keyboard.press('5');
   await page.waitForTimeout(300);
   expect((await b.battle()).score).toBe(sc);
   await expect.poll(async () => (await b.battle()).scattered, { timeout: 15_000 }).toBe(false);
@@ -143,14 +143,78 @@ test('收尾時間：剩 30 秒時提示「最後 30 秒，慢慢收拳」', asy
 test('踩扁：跳起來落下踩中得 40 分，木偶被壓扁後彈回', async ({ page }) => {
   await toBattle(page, 60);
   const b = bt(page);
-  await expect(page.locator('.moves .mv')).toHaveCount(4);
+  await expect(page.locator('.moves .mv')).toHaveCount(6);
   const s = await b.battle();
   await b.setPlayerX(s.puppetX - 3.2);
-  await page.keyboard.press('4');
+  await page.keyboard.press('6');
   await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(40);
   await expect.poll(async () => (await b.battle()).flat, { timeout: 10_000 }).toBe(false);
   // 冷卻 3 秒：馬上再按不會出招
-  await page.keyboard.press('4');
+  await page.keyboard.press('6');
   await page.waitForTimeout(300);
   expect((await b.battle()).score).toBe(40);
+});
+
+test('階段 4 招式：迴旋踢、飛踢（逐幀判定只算一次）、棍棒 3 段、水桶套頭暈眩、桌椅碎成泡棉、鐵錘手風琴後噴飛', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = watchConsole(page);
+  await toBattle(page, 180);
+  const b = bt(page);
+  const near = async (gap: number) => {
+    // 等木偶回到地面、停下來再把玩家放到牠前方
+    await expect.poll(async () => {
+      const s = await b.battle();
+      return !s.scattered && s.puppetLift === 0 && !s.attacking;
+    }, { timeout: 20_000 }).toBe(true);
+    await page.waitForTimeout(600);
+    await b.setPlayerX((await b.battle()).puppetX - gap);
+    return (await b.battle()).score;
+  };
+
+  // 迴旋踢 30 分（徒手 2）
+  let s0 = await near(3.4);
+  await page.keyboard.press('2');
+  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(s0 + 30);
+
+  // 飛踢：突進途中撞到，整段只得 30 分
+  s0 = await near(7);
+  await page.keyboard.press('4');
+  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(s0 + 30);
+  await expect.poll(async () => (await b.battle()).attacking, { timeout: 10_000 }).toBe(false);
+  expect((await b.battle()).score).toBe(s0 + 30);
+  // 擊退後不會穿過玩家
+  const after = await b.battle();
+  expect(after.puppetX).toBeGreaterThan(after.playerX);
+
+  // 武器
+  await page.keyboard.press('q');
+  await expect(page.locator('.moves .mv')).toHaveCount(5);
+
+  // 棍棒連打 15＋15＋25
+  s0 = await near(3);
+  await page.keyboard.press('1');
+  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBeGreaterThanOrEqual(s0 + 55);
+
+  // 丟水桶：套頭並暈眩，1.5 秒後拿掉
+  s0 = await near(6);
+  await page.keyboard.press('2');
+  await expect.poll(async () => (await b.battle()).bucket, { timeout: 10_000 }).toBe(true);
+  expect((await b.battle()).stunned).toBe(true);
+  await expect.poll(async () => (await b.battle()).bucket, { timeout: 15_000 }).toBe(false);
+  expect((await b.battle()).score).toBeGreaterThanOrEqual(s0 + 35);
+
+  // 丟桌椅：碎成泡棉塊，1.5 秒後清除
+  s0 = await near(6);
+  await page.keyboard.press('3');
+  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBeGreaterThanOrEqual(s0 + 50);
+  expect((await b.battle()).projectiles).toBeGreaterThan(0);
+  await expect.poll(async () => (await b.battle()).projectiles, { timeout: 15_000 }).toBe(0);
+
+  // 鐵錘：蓄力 0.6 秒，命中後壓成手風琴，接著噴飛再組回
+  s0 = await near(2.6);
+  await page.keyboard.press('5');
+  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBeGreaterThanOrEqual(s0 + 60);
+  await expect.poll(async () => (await b.battle()).scattered, { timeout: 10_000 }).toBe(true);
+  await expect.poll(async () => (await b.battle()).scattered, { timeout: 20_000 }).toBe(false);
+  expect(errors).toEqual([]);
 });

@@ -49,6 +49,9 @@ export interface BattleDebug {
   hits: number;
   showT: number;
   flat: boolean;
+  stunned: boolean;
+  bucket: boolean;
+  accordion: boolean;
 }
 
 export const bt = (page: Page) => ({

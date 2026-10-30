@@ -8,9 +8,13 @@ import type { PaintStore } from './paintSurface';
 import { PART_DEFS, SKELETON as SK, type FixedPartId, type PaintPartId } from './parts';
 import { Scatter } from './scatter';
 import { buildAccessory, type AccessorySlot } from './looks/accessories';
+import { buildBucket } from '../projectiles/weaponModels';
 import { DelayBuffer, spring0, stepSpring, type Spring } from './spring';
 
 const R = PUPPET.reactions;
+/** 地面摩擦下滑行 dist 所需的初速（每秒保留比例 f → 衰減率 -ln f） */
+const knockSpeed = (dist: number) => dist * -Math.log(PUPPET.groundFriction);
+const easeOut = (t: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
 const CH = ['torsoZ', 'torsoX', 'headX', 'headY', 'headZ', 'shL', 'elL', 'shR', 'elR', 'hipL', 'hipR', 'hipLx', 'hipRx', 'knL', 'knR'] as const;
 type Channel = (typeof CH)[number];
 type Pose = Record<Channel, number>;
@@ -46,6 +50,13 @@ export class Puppet {
   private drop = spring0();
   private fadeLevel = 1;
   private flatT = 0;
+  /** 迴旋踢轉圈、暈眩、手風琴的剩餘時間 */
+  private spinT = 0;
+  private spinDir: 1 | -1 = 1;
+  private stunT = 0;
+  private accT = 0;
+  private explodeAfterAcc = false;
+  private bucket: Object3D | null = null;
   private fadeMats: MeshStandardMaterial[] | null = null;
   readonly meshes = {} as Record<PaintPartId, Mesh>;
   readonly fixed = {} as Record<FixedPartId, Mesh>;
@@ -255,6 +266,7 @@ export class Puppet {
     for (const c of CH) this.pose[c] = spring0();
     this.waveT = this.downT = 0;
     this.flatT = 0;
+    this.clearStatus();
     this.act = null;
     this.aiPose = 'idle';
     this.poseMode = 'stand';
@@ -321,6 +333,96 @@ export class Puppet {
 
   get isFlat() {
     return this.flatT > 0;
+  }
+
+  /** 迴旋踢：原地轉一圈並後退 1H。 */
+  spinKick(dir: number) {
+    const r = R.spinKick;
+    this.spinT = r.time;
+    this.spinDir = dir < 0 ? -1 : 1;
+    this.vx += dir * knockSpeed(r.distance * PUPPET.height);
+    this.sy.vel += r.squashY;
+  }
+
+  /** 飛踢：擊退 2H（撞牆回彈，由場地邊界處理），倒地後起身。 */
+  flyKicked(dir: number) {
+    const r = R.flyKick;
+    this.vx += dir * knockSpeed(r.distance * PUPPET.height);
+    this.pose.torsoZ.vel -= dir * r.torso;
+    this.sx.vel += r.squashX;
+    if (!this.airborne) this.downT = R.getUpTime;
+    else this.vy = Math.max(this.vy, 4);
+  }
+
+  /** 棍棒連打：前兩下輕敲，第 3 下強烈壓縮。 */
+  clubHit(dir: number, segment: number) {
+    const r = R.club;
+    if (segment < 2) {
+      this.sy.vel += r.light.squashY;
+      this.pose.headX.vel += r.light.headX;
+      this.vx += dir * r.light.push;
+    } else {
+      this.sy.v = r.strong.y;
+      this.sx.v = r.strong.x;
+      this.sy.vel = this.sx.vel = 0;
+      this.vx += dir * r.strong.push;
+    }
+    if (this.airborne) this.vy = Math.max(this.vy, 3);
+  }
+
+  /** 水桶套頭：暈眩 1.5 秒（不出拳），桶子跟著頭動。 */
+  bucketHit(dir: number) {
+    const r = R.bucket;
+    this.stunT = r.stun;
+    this.vx += dir * r.push;
+    this.pose.headZ.vel -= dir * 10;
+    if (!this.bucket) {
+      const b = buildBucket();
+      const [w, h] = PART_DEFS.head.size;
+      const k = ((w / 2) * r.scale) / 0.56;
+      b.scale.setScalar(k);
+      b.rotation.x = Math.PI;
+      b.position.y = h * 0.28;
+      this.meshes.head.add(b);
+      this.bucket = b;
+    }
+  }
+
+  get isStunned() {
+    return this.stunT > 0;
+  }
+
+  get hasBucket() {
+    return this.bucket !== null;
+  }
+
+  /** 桌椅砸中：大力擊退與壓扁。 */
+  chairHit(dir: number) {
+    const r = R.chair;
+    this.vx += dir * r.push;
+    this.sx.vel += r.squashX;
+    this.sy.vel += r.squashY;
+    this.pose.torsoZ.vel -= dir * r.torso;
+    if (!this.airborne) this.downT = R.getUpTime;
+  }
+
+  /** 鐵錘敲頭：壓成手風琴 0.5 秒後彈回，接著噴飛再組回。 */
+  hammerHit() {
+    this.accT = R.hammer.time;
+    this.explodeAfterAcc = true;
+    this.flatT = 0;
+  }
+
+  get isAccordion() {
+    return this.accT > 0;
+  }
+
+  /** 清除暫時狀態（暈眩、套頭水桶、手風琴、轉圈）：重新開始、道歉轉場時呼叫。 */
+  clearStatus() {
+    this.spinT = this.stunT = this.accT = 0;
+    this.explodeAfterAcc = false;
+    this.bucket?.removeFromParent();
+    this.bucket = null;
   }
 
   /** 強力擊退（撞牆回彈測試）。 */
@@ -402,6 +504,14 @@ export class Puppet {
     }
     this.waveT = Math.max(0, this.waveT - dt);
     this.downT = Math.max(0, this.downT - dt);
+    this.spinT = Math.max(0, this.spinT - dt);
+    if (this.stunT > 0) {
+      this.stunT = Math.max(0, this.stunT - dt);
+      if (this.stunT === 0) {
+        this.bucket?.removeFromParent();
+        this.bucket = null;
+      }
+    }
     this.decals.update(dt);
 
     const S = PUPPET.springs;
@@ -449,7 +559,22 @@ export class Puppet {
     stepSpring(this.yaw, this.yawTarget, S.spin.k * 0.5, S.spin.d, dt);
     // 跪下、坐下時身體往下沉，膝蓋或屁股碰到地板
     stepSpring(this.drop, this.poseMode === 'kneel' ? PUPPET.kneelDrop : this.poseMode === 'sit' ? PUPPET.sitDrop : 0, 60, 14, dt);
-    if (this.flatT > 0) {
+    if (this.accT > 0) {
+      // 手風琴：壓扁並上下起伏，時間到用力彈回，接著噴飛
+      const H = R.hammer;
+      this.accT -= dt;
+      this.sy.v = H.y + Math.sin(this.time * H.rippleSpeed) * H.ripple;
+      this.sx.v = H.x - Math.sin(this.time * H.rippleSpeed) * H.ripple * 0.5;
+      if (this.accT <= 0) {
+        this.accT = 0;
+        this.sy.vel = H.bounce;
+        this.sx.vel = -H.bounce * 0.4;
+        if (this.explodeAfterAcc) {
+          this.explodeAfterAcc = false;
+          this.explode(1, env.reducedMotion);
+        }
+      }
+    } else if (this.flatT > 0) {
       // 壓扁中：維持扁扁一片，時間到用力彈回
       this.flatT -= dt;
       this.sy.v = R.flatten.y;
@@ -535,6 +660,16 @@ export class Puppet {
       T.knR = 0.6;
       T.headX = 0.2;
     }
+    if (this.stunT > 0) {
+      // 暈頭轉向：頭與身體繞圈晃、雙手垂下
+      const w = R.bucket.wobble;
+      T.headZ = Math.sin(this.time * 7) * w;
+      T.headX = Math.cos(this.time * 7) * w * 0.6;
+      T.torsoZ = Math.sin(this.time * 7 + 0.8) * w * 0.35;
+      T.shL = -0.05;
+      T.shR = 0.05;
+      T.elL = T.elR = 0;
+    }
     if (this.aiPose !== 'idle' && !this.airborne) {
       const k = this.aiSide < 0 ? 1 : -1;
       const sh = this.aiSide < 0 ? 'shL' : 'shR';
@@ -607,7 +742,9 @@ export class Puppet {
     j.elR.rotation.z = p.elR.v;
     j.hipL.rotation.set(p.hipLx.v, 0, p.hipL.v);
     j.hipR.rotation.set(p.hipRx.v, 0, p.hipR.v);
-    this.yawG.rotation.y = this.yaw.v;
+    // 迴旋踢：在站姿朝向上額外轉一整圈
+    const spin = this.spinT > 0 ? this.spinDir * Math.PI * 2 * easeOut(1 - this.spinT / R.spinKick.time) : 0;
+    this.yawG.rotation.y = this.yaw.v + spin;
     j.knL.rotation.x = p.knL.v;
     j.knR.rotation.x = p.knR.v;
     const head = this.meshes.head;
@@ -643,6 +780,7 @@ export class Puppet {
   }
 
   dispose() {
+    this.clearStatus();
     this.offAcc();
     this.offPaint();
     this.accObjects.forEach((o) => o.removeFromParent());
