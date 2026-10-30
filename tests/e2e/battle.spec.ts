@@ -22,9 +22,9 @@ test('第一次進開戰準備會自動顯示操作教學，之後不再自動�
   // 困難模式在第 5 階段才有，現在只顯示簡單
   await expect(page.getByRole('radio', { name: '簡單' })).toBeVisible();
   await expect(page.getByRole('radio', { name: '困難' })).toHaveCount(0);
-  // 回合固定 3 分鐘：沒有長度選項，只有說明
+  // 回合固定 1 分鐘：沒有長度選項，只有說明
   await expect(page.getByRole('radio', { name: '5 分鐘' })).toHaveCount(0);
-  await expect(page.getByTestId('round-note')).toContainText('每回合 3 分鐘');
+  await expect(page.getByTestId('round-note')).toContainText('每回合 1 分鐘');
 });
 
 test('命中得分、落空不得分、投射物碰撞、冷卻、暫停、時間到只結束一次', async ({ page }) => {

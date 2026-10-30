@@ -1,7 +1,7 @@
 /** 回合、難度與節奏 */
 export const ROUND = {
-  /** 回合長度固定 3 分鐘（秒） */
-  defaultLength: 180,
+  /** 回合長度固定 1 分鐘（秒） */
+  defaultLength: 60,
   /** 開發用 ?round=30 允許的範圍 */
   devMin: 5,
   devMax: 600,
