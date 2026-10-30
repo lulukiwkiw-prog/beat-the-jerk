@@ -248,3 +248,5 @@ interface HitEvent { hitId: HitId; moveId: MoveId; segment: number; at: number; 
 - 休息提示「先休息」→ 播放結局 5 的平靜畫面。
 - 部署：`.github/workflows/deploy.yml`（GitHub Actions 建置後部署到 Pages），需到 repo 的 Settings → Pages 把 Source 設為 GitHub Actions。
 - 晴天娃娃：圓球頭＋短圓錐波浪邊布（剛好蓋住肩膀上緣，布面在軀幹外側）。
+- 新招「踩扁」（徒手第 4 招，鍵盤 4）：前搖 0.35 秒跳起、往前跳到木偶上方落下，40 分、冷卻 3 秒、距離 0.8H，木偶壓成一片 0.6 秒後彈回；鏡頭把跳躍高度算進去。使用者在階段 3 後追加（原十招表沒有這招）。
+- 髮型追加：米粉頭（滿頭立體小捲）、爆炸頭（大團蓬蓬捲髮）。

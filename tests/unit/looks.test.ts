@@ -3,9 +3,9 @@ import { ACCESSORY_IDS, buildAccessory } from '../../src/game/puppet/looks/acces
 import { LOOKS, looksOf } from '../../src/game/puppet/looks/presets';
 
 describe('範例', () => {
-  it('臉部 10、髮型 7、服裝 6 款', () => {
+  it('臉部 10、髮型 9、服裝 6 款', () => {
     expect(looksOf('face')).toHaveLength(10);
-    expect(looksOf('hair')).toHaveLength(7);
+    expect(looksOf('hair')).toHaveLength(9);
     expect(looksOf('costume')).toHaveLength(6);
   });
   it('名稱不重複、沒有真實人物名稱', () => {

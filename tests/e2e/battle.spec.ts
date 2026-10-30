@@ -139,3 +139,18 @@ test('收尾時間：剩 30 秒時提示「最後 30 秒，慢慢收拳」', asy
   await toBattle(page, 33);
   await expect(page.getByText('最後 30 秒，慢慢收拳')).toBeVisible({ timeout: 20_000 });
 });
+
+test('踩扁：跳起來落下踩中得 40 分，木偶被壓扁後彈回', async ({ page }) => {
+  await toBattle(page, 60);
+  const b = bt(page);
+  await expect(page.locator('.moves .mv')).toHaveCount(4);
+  const s = await b.battle();
+  await b.setPlayerX(s.puppetX - 3.2);
+  await page.keyboard.press('4');
+  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(40);
+  await expect.poll(async () => (await b.battle()).flat, { timeout: 10_000 }).toBe(false);
+  // 冷卻 3 秒：馬上再按不會出招
+  await page.keyboard.press('4');
+  await page.waitForTimeout(300);
+  expect((await b.battle()).score).toBe(40);
+});

@@ -12,7 +12,7 @@ import { DESIGN_SIZES, PART_DEFS, type FixedPartId, type PaintPartId } from '../
  */
 export type AccessoryId =
   | 'pigHead' | 'teruteru' | 'chickenHead' | 'dinoHead'
-  | 'longHair' | 'shortHair' | 'ponytail' | 'swoop' | 'slick' | 'buzz'
+  | 'longHair' | 'shortHair' | 'ponytail' | 'swoop' | 'slick' | 'buzz' | 'perm' | 'afro'
   | 'chickenSuit' | 'longDress' | 'shortDress' | 'pigBody' | 'dinoSuit';
 
 export type AccessorySlot = 'face' | 'hair' | 'costume';
@@ -281,6 +281,48 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
     return [{ part: 'head', object: group(dome(C, 0.16), right) }];
   },
   buzz: () => [{ part: 'head', object: dome('#3A3A40', 0.12) }],
+  // 米粉頭：燙得很捲的小捲，整顆頭布滿一顆顆小圓捲
+  perm: () => {
+    const C = '#2A2422';
+    const curls: Mesh[] = [];
+    const rings = [
+      { y: 0.66, r: 0.08, n: 1 },
+      { y: 0.62, r: 0.26, n: 8 },
+      { y: 0.52, r: 0.44, n: 13 },
+      { y: 0.36, r: 0.58, n: 17 },
+      { y: 0.16, r: 0.63, n: 19 },
+      { y: -0.04, r: 0.64, n: 19, back: true },
+      { y: -0.22, r: 0.6, n: 17, back: true },
+    ];
+    rings.forEach((ring, ri) => {
+      for (let i = 0; i < ring.n; i++) {
+        const th = ((i + (ri % 2) * 0.5) / ring.n) * Math.PI * 2;
+        const x = Math.sin(th) * ring.r;
+        const z = Math.cos(th) * ring.r;
+        // 臉的正面下半部不長捲髮
+        if (ring.back && z > 0.1) continue;
+        curls.push(ball(0.12, C, x, ring.y, z * 0.95));
+      }
+    });
+    return [{ part: 'head', object: group(...curls) }];
+  },
+  // 爆炸頭：一大團圓蓬蓬的捲髮，表面一顆顆凸起
+  afro: () => {
+    const C = '#3B2A22';
+    const big = ball(0.92, C, 0, 0.42, -0.12, [1, 0.92, 0.95]);
+    const bumps: Mesh[] = [];
+    for (let i = 0; i < 46; i++) {
+      // 黃金角均勻散在球面上，前下方（臉）不放
+      const yy = 1 - (i + 0.5) / 46 * 1.6;
+      const rr = Math.sqrt(Math.max(0, 1 - yy * yy));
+      const th = i * 2.39996;
+      const x = Math.sin(th) * rr;
+      const z = Math.cos(th) * rr;
+      if (z > 0.45 && yy < 0.25) continue;
+      bumps.push(ball(0.2, C, x * 0.9, 0.42 + yy * 0.83, -0.12 + z * 0.88));
+    }
+    return [{ part: 'head', object: group(big, ...bumps) }];
+  },
   chickenSuit: () => {
     const Y = '#FFD23F';
     const tail = [-0.5, 0, 0.5].map((r, i) => box(0.26, 0.8 - Math.abs(r) * 0.3, 0.14, 0.08, i === 1 ? '#FFE680' : Y, r * 0.5, TORSO.bottom + 0.3, TORSO.back - 0.18, [-0.9, 0, r]));

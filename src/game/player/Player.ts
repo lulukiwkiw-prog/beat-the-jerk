@@ -148,6 +148,19 @@ export class Player {
       slap = { arm: this.facing > 0 ? 'L' : 'R', shX: -(Math.PI / 2 + elev) * Math.min(1, inOut * 1.5) };
     }
     if (this.script) face = this.script.yaw;
+    let stomp: number | null = null;
+    if (a && a.move.id === 'stomp') {
+      // 跳起來往前跳到木偶上方，落下踩扁，站一下再跳回原位
+      const S = PLAYER.stompAnim;
+      const t = a.t;
+      const w = a.move.windup;
+      const overX = target.x - this.facing * S.overshoot;
+      const reach = t < w ? smooth(t / w) : t < S.hold ? 1 : 1 - smooth((t - S.hold) / (S.land - S.hold));
+      L.root.position.x = this.x + (overX - this.x) * reach;
+      const y = t < S.rise ? S.peak * Math.sin((t / S.rise) * (Math.PI / 2)) : t < w ? S.peak + (S.standY - S.peak) * smooth((t - S.rise) / (w - S.rise)) : t < S.hold ? S.standY : S.standY * (1 - smooth((t - S.hold) / (S.land - S.hold)));
+      L.root.position.y = this.hop + y;
+      stomp = t;
+    }
     this.bodyYaw += (face - this.bodyYaw) * Math.min(1, frameDt * yawRate);
     L.body.rotation.y = this.bodyYaw;
     L.body.rotation.z = this.stun > 0 ? 0.22 * this.facing : this.dodge > 0 ? 0.3 * this.facing : 0;
@@ -183,6 +196,11 @@ export class Player {
           A.elR = 0;
         }
         open = true;
+      } else if (m.id === 'stomp' && stomp !== null) {
+        // 雙手高舉
+        A.shL = [-2.7, -0.3];
+        A.shR = [-2.7, 0.3];
+        A.elL = A.elR = -0.2;
       } else if (m.id === 'shoe') {
         const p = Math.min(1, t / 0.12);
         A.shR = [lerp(1.0, -2.1, p), 0];
@@ -201,6 +219,12 @@ export class Player {
     const st = step === 0 ? PLAYER.stance : { front: 0, back: 0 };
     L.legL.rotation.x = step + (frontR ? st.back : -st.front);
     L.legR.rotation.x = -step + (frontR ? -st.front : st.back);
+    if (stomp !== null) {
+      // 空中縮腿、落下時伸直往下踩
+      const tuck = stomp < (a?.move.windup ?? 0) ? -0.9 : -0.1;
+      L.legL.rotation.x = tuck;
+      L.legR.rotation.x = tuck + 0.3;
+    }
     if (this.script?.sit) {
       // 坐在舞台邊緣：雙腿往前、身體下沉、手放在膝上
       L.legL.rotation.x = L.legR.rotation.x = -1.45;

@@ -380,7 +380,7 @@ export class BattleController {
       if (segment === 0) this.words.add('揮空', pl.x + att.facing * 1.6, 3.6, '#C9D2F2', 0.55);
       return;
     }
-    const at = new Vector3(p.x - att.facing * 0.4, p.lift + (m.id === 'slap' ? 4.1 : 3.2), 0.6);
+    const at = new Vector3(p.x - att.facing * 0.4, p.lift + (m.id === 'slap' ? 4.1 : m.id === 'stomp' ? 1.4 : 3.2), 0.6);
     this.applyHit(m.id, hitIdOf(this.round, att.seq, segment), segment, at);
   }
 
@@ -398,13 +398,14 @@ export class BattleController {
     else if (id === 'uppercut') p.launch(dir);
     else if (id === 'slap') p.slap(dir);
     else if (id === 'shoe') p.shoeHit(dir);
+    else if (id === 'stomp') p.flatten();
     this.ai.interrupt();
     p.setAiPose('idle', dir);
     this.dom.alert.hidden = true;
     this.hits++;
     this.handleDialogue(this.director.onHit(this.gameTime));
 
-    const big = id === 'uppercut' || id === 'shoe';
+    const big = id === 'uppercut' || id === 'shoe' || id === 'stomp';
     const s = this.fxScale();
     this.particles.burst(at, 'star', Math.round((big ? 6 : 3) * s));
     this.particles.burst(at, 'chip', Math.round((big ? 10 : 5) * s));
@@ -625,7 +626,7 @@ export class BattleController {
       aspect: this.host.camera.aspect,
       fov: this.host.camera.fov,
       actors: [
-        { x: pl.x, halfWidth: 1.0, top: PLAYER_TOP + 0.3 },
+        { x: pl.rig.root.position.x, halfWidth: 1.0, top: PLAYER_TOP + 0.3 + Math.max(0, pl.rig.root.position.y) },
         { x: p.x, halfWidth: PUPPET.halfWidth + (p.airborne ? 0.6 : 0), top: p.lift + PUPPET.height },
       ],
     });
@@ -702,6 +703,7 @@ export class BattleController {
       bubble: this.bubble.visible ? (this.dom.bubble.textContent ?? '') : '',
       hits: this.hits,
       showT: this.showT,
+      flat: this.puppet.isFlat,
     };
   }
 

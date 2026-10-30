@@ -24,7 +24,7 @@ const LAYOUT: Record<string, [number, number, number, number]> = {
   shoeL: [-SK.hipX, torsoBase + SK.kneeY + SK.shoe.y, 0.74, 0.28],
   shoeR: [SK.hipX, torsoBase + SK.kneeY + SK.shoe.y, 0.74, 0.28],
 };
-const HEAD_ACC: AccessoryId[] = ['pigHead', 'teruteru', 'chickenHead', 'dinoHead', 'longHair', 'shortHair', 'ponytail', 'swoop', 'slick', 'buzz'];
+const HEAD_ACC: AccessoryId[] = ['pigHead', 'teruteru', 'chickenHead', 'dinoHead', 'longHair', 'shortHair', 'ponytail', 'swoop', 'slick', 'buzz', 'perm', 'afro'];
 
 type View = { cx: number; cy: number; span: number };
 const VIEWS: Record<'head' | 'body', View> = {
@@ -130,6 +130,20 @@ function overlayDesign(c: CanvasRenderingContext2D, id: AccessoryId) {
     case 'buzz':
       r('#3A3A40', 0, top + 0.07, 1.26, 0.14);
       break;
+    case 'perm':
+      for (let i = 0; i < 9; i++) e('#2A2422', -0.56 + i * 0.14, top + 0.04 + (i % 2) * 0.08, 0.1, 0.1);
+      for (let i = 0; i < 4; i++) {
+        e('#2A2422', -0.64, top - 0.15 - i * 0.16, 0.1, 0.1);
+        e('#2A2422', 0.64, top - 0.15 - i * 0.16, 0.1, 0.1);
+      }
+      break;
+    case 'afro':
+      e('#3B2A22', 0, top + 0.05, 0.95, 0.8);
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        e('#3B2A22', Math.cos(a) * 0.92, top + 0.05 + Math.sin(a) * 0.78, 0.2, 0.2);
+      }
+      break;
     case 'chickenSuit':
       e('#FFE680', 0, 2.85, 0.6, 0.6);
       for (const x of [-1.45, 1.45]) r('#FFD23F', x, 2.7, 0.16, 1.5);
@@ -167,7 +181,7 @@ export function drawLookIcon(cv: HTMLCanvasElement, look: LookPreset) {
   c.clearRect(0, 0, cv.width, cv.height);
   c.setTransform(s, 0, 0, -s, cv.width / 2 - v.cx * s, cv.height / 2 + v.cy * s);
   // 立體配件中在身體後面的部分（長髮、裙子）先畫，再畫身體
-  const behind: AccessoryId[] = ['longHair', 'ponytail', 'dinoSuit'];
+  const behind: AccessoryId[] = ['longHair', 'ponytail', 'dinoSuit', 'afro'];
   if (look.accessory && behind.includes(look.accessory)) overlay(c, look.accessory);
   for (const [part, [x, y, w, h]] of Object.entries(LAYOUT)) {
     const fixed = part.startsWith('hand') || part.startsWith('shoe') || part === 'neck';

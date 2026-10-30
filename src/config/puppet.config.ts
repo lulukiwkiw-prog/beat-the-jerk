@@ -16,7 +16,7 @@ export const PUPPET = {
     squash: { k: 260, d: 11 },
     spin: { k: 90, d: 12 },
   },
-  squashLimits: { minX: 0.6, maxX: 1.5, minY: 0.55, maxY: 1.45 },
+  squashLimits: { minX: 0.6, maxX: 1.5, maxY: 1.45 },
   /** 四肢延遲擺動（秒，規格 60–120ms） */
   limbDelay: 0.09,
   /** 地面摩擦：每秒保留比例 */
@@ -34,6 +34,8 @@ export const PUPPET = {
     shoe: { push: 3, squashX: 6, squashY: -5, torso: 5, decalLife: 3 },
     /** 撞牆測試：擊退速度 */
     wallSmash: { push: 15, squashY: 6 },
+    /** 踩扁：壓成一片（高度比例、橫向比例）持續秒數，之後彈回 */
+    flatten: { y: 0.28, x: 1.4, time: 0.6, bounce: 10 },
     /** 落地：超過此速度重摔→噴飛；超過 soft 則壓扁 */
     landing: { scatterImpact: 14, softImpact: 3, squash: 0.6 },
     /** 倒地後起身時間上限（秒） */

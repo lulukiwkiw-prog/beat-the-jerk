@@ -388,6 +388,8 @@ export const LOOKS: LookPreset[] = [
   { id: 'swoop', kind: 'hair', label: '金色蓬蓬旁分', paint: { head: hairPaint(BLOND, { sides: 0.5, back: 0.55, front: sidePart(BLOND) }) }, accessory: 'swoop' },
   { id: 'slick', kind: 'hair', label: '西裝頭', paint: { head: hairPaint(INK, { sides: 0.35, back: 0.5, front: sidePart(INK) }) }, accessory: 'slick' },
   { id: 'buzz', kind: 'hair', label: '平頭', paint: { head: { [F.PY]: buzz('#2B2B33'), [F.PX]: all(fillTop('#6E6E76', 0.35)), [F.NX]: fillTop('#6E6E76', 0.35), [F.NZ]: fillTop('#6E6E76', 0.4), [F.PZ]: fillTop('#6E6E76', 0.2) } }, accessory: 'buzz' },
+  { id: 'perm', kind: 'hair', label: '米粉頭', paint: { head: hairPaint('#2A2422', { sides: 0.45, back: 0.75, front: fringe('#2A2422', 0.14) }) }, accessory: 'perm' },
+  { id: 'afro', kind: 'hair', label: '爆炸頭', paint: { head: hairPaint('#3B2A22', { sides: 0.6, back: 0.9, front: fringe('#3B2A22', 0.12) }) }, accessory: 'afro' },
   // 服裝
   { id: 'chickenSuit', kind: 'costume', label: '尖叫雞', paint: body({ torso: CHICK, arms: CHICK, legs: CHICK }, bellyPaint('#FFE680')), accessory: 'chickenSuit' },
   {

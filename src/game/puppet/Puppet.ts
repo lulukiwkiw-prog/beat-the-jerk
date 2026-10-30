@@ -45,6 +45,7 @@ export class Puppet {
   private poseMode: 'stand' | 'kneel' | 'sit' = 'stand';
   private drop = spring0();
   private fadeLevel = 1;
+  private flatT = 0;
   private fadeMats: MeshStandardMaterial[] | null = null;
   readonly meshes = {} as Record<PaintPartId, Mesh>;
   readonly fixed = {} as Record<FixedPartId, Mesh>;
@@ -253,6 +254,7 @@ export class Puppet {
     this.sy = spring0(1);
     for (const c of CH) this.pose[c] = spring0();
     this.waveT = this.downT = 0;
+    this.flatT = 0;
     this.act = null;
     this.aiPose = 'idle';
     this.poseMode = 'stand';
@@ -307,6 +309,18 @@ export class Puppet {
     this.pose.torsoZ.vel -= dir * r.torso;
     const [w, h, d] = PART_DEFS.torso.size;
     this.decals.add(this.meshes.torso, 'shoe', 0.55, 0.75, d / 2, r.decalLife, [w * 0.45, h * 0.35]);
+  }
+
+  /** 被踩扁：整個壓成一片，時間到彈回。 */
+  flatten() {
+    this.flatT = R.flatten.time;
+    this.sy.v = R.flatten.y;
+    this.sx.v = R.flatten.x;
+    this.sy.vel = this.sx.vel = 0;
+  }
+
+  get isFlat() {
+    return this.flatT > 0;
   }
 
   /** 強力擊退（撞牆回彈測試）。 */
@@ -435,11 +449,23 @@ export class Puppet {
     stepSpring(this.yaw, this.yawTarget, S.spin.k * 0.5, S.spin.d, dt);
     // 跪下、坐下時身體往下沉，膝蓋或屁股碰到地板
     stepSpring(this.drop, this.poseMode === 'kneel' ? PUPPET.kneelDrop : this.poseMode === 'sit' ? PUPPET.sitDrop : 0, 60, 14, dt);
-    stepSpring(this.sx, 1, S.squash.k, S.squash.d, dt);
-    stepSpring(this.sy, 1, S.squash.k, S.squash.d, dt);
-    const L = PUPPET.squashLimits;
-    this.sx.v = Math.max(L.minX, Math.min(L.maxX, this.sx.v));
-    this.sy.v = Math.max(L.minY, Math.min(L.maxY, this.sy.v));
+    if (this.flatT > 0) {
+      // 壓扁中：維持扁扁一片，時間到用力彈回
+      this.flatT -= dt;
+      this.sy.v = R.flatten.y;
+      this.sx.v = R.flatten.x;
+      if (this.flatT <= 0) {
+        this.sy.vel = R.flatten.bounce;
+        this.sx.vel = -R.flatten.bounce * 0.5;
+      }
+    } else {
+      stepSpring(this.sx, 1, S.squash.k, S.squash.d, dt);
+      stepSpring(this.sy, 1, S.squash.k, S.squash.d, dt);
+      const L = PUPPET.squashLimits;
+      this.sx.v = Math.max(L.minX, Math.min(L.maxX, this.sx.v));
+      // 不設下限：被踩扁後才能從扁扁一片自然彈回
+      this.sy.v = Math.min(L.maxY, this.sy.v);
+    }
 
     this.delayed.push(this.time, { torso: this.pose.torsoZ.v, vx: this.vx });
     const T = this.targets();

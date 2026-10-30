@@ -48,6 +48,7 @@ export interface BattleDebug {
   bubble: string;
   hits: number;
   showT: number;
+  flat: boolean;
 }
 
 export const bt = (page: Page) => ({

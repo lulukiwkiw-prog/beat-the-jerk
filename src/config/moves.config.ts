@@ -4,7 +4,7 @@ import { H } from './game.config';
  * 招式表（SPEC 第 9 節）。距離以 H（積木人站立身高）為單位。
  * 階段 2 只啟用 1、3、5（徒手）與 9（武器）；其餘於階段 4 加入。
  */
-export type MoveId = 'jab' | 'uppercut' | 'slap' | 'shoe';
+export type MoveId = 'jab' | 'uppercut' | 'slap' | 'stomp' | 'shoe';
 export type MoveKind = 'hand' | 'weapon';
 
 export interface MeleeMove {
@@ -71,6 +71,11 @@ export const MOVES: Record<MoveId, MoveDef> = {
     windup: 0.06, hits: 1, interval: 0, range: 0.5, backRange: 0, cooldown: 0.5,
     score: [15], duration: 0.32, maxTargetLift: 0.9, words: ['啪！！'],
   },
+  stomp: {
+    id: 'stomp', kind: 'hand', type: 'melee', name: '踩扁',
+    windup: 0.35, hits: 1, interval: 0, range: 0.8, backRange: 0, cooldown: 3,
+    score: [40], duration: 0.75, maxTargetLift: 0.3, words: ['扁！'],
+  },
   shoe: {
     id: 'shoe', kind: 'weapon', type: 'throw', name: '丟鞋子',
     windup: 0.1, cooldown: 0.8, score: [15], duration: 0.3,
@@ -80,7 +85,7 @@ export const MOVES: Record<MoveId, MoveDef> = {
 
 /** 各類型目前可用的招式（依按鈕順序，對應鍵盤 1～5）。 */
 export const MOVE_SETS: Record<MoveKind, MoveId[]> = {
-  hand: ['jab', 'uppercut', 'slap'],
+  hand: ['jab', 'uppercut', 'slap', 'stomp'],
   weapon: ['shoe'],
 };
 
@@ -99,6 +104,8 @@ export const PLAYER = {
   /** 格鬥站姿：前腳往前、後腳往後（弧度） */
   stance: { front: 0.3, back: 0.25 },
   /** 甩巴掌動畫：肩高、手臂長（到掌心）、踏步上限、時間點（秒）、扭腰角度 */
+  /** 踩扁動畫：最高點、站在扁木偶上的高度、時間點（秒） */
+  stompAnim: { peak: 3.2, standY: 1.5, rise: 0.25, hold: 0.55, land: 0.72, overshoot: 0.45 },
   slapAnim: { shoulderY: 2.93, armLength: 1.55, maxLunge: 2.6, lungeIn: 0.05, hold: 0.16, twistBack: 0.65, twistThrough: 0.45 },
 } as const;
 
