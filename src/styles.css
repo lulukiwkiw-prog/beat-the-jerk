@@ -360,7 +360,7 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
 /* 降溫段 */
 .calm { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(circle at 50% 50%, rgba(60, 50, 90, 0.75), rgba(25, 22, 45, 0.92)); color: #fff8ec; overflow: hidden; pointer-events: auto; }
 .calm-title { margin: 0; font-size: clamp(18px, 4.4vw, 24px); font-weight: 800; text-align: center; padding: 0 56px; }
-.calm-skip { position: absolute; top: 10px; right: 10px; }
+.calm-skip { position: absolute; top: 10px; right: 10px; color: var(--ink); }
 .calm-ring { width: min(46vw, 220px); aspect-ratio: 1; border-radius: 50%; border: 3px solid rgba(255, 220, 150, 0.9); box-shadow: 0 0 40px rgba(255, 210, 130, 0.6), inset 0 0 30px rgba(255, 210, 130, 0.35); transform: scale(0.6); transition-property: transform, opacity; transition-timing-function: ease-in-out; }
 .calm-ring[data-inhale='true'] { transform: scale(1); }
 .calm-ring.reduced { transform: none; opacity: 0.45; transition-property: opacity; }

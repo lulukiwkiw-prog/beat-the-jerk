@@ -129,7 +129,8 @@ export class BattleController {
   private forgiveFx: ForgiveFx | null = null;
   private leaveFx: LeaveFx | null = null;
   private walkFrom = { puppet: 0, player: 0 };
-  private camOverride: { x: number; dist: number; lookY: number; camY: number } | null = null;
+  /** 演出用鏡頭；minHalfW＝左右至少要看到的半寬，窄螢幕會自動拉遠 */
+  private camOverride: { x: number; dist: number; lookY: number; camY: number; minHalfW?: number } | null = null;
 
   constructor(
     private readonly dom: BattleDom,
@@ -561,7 +562,7 @@ export class BattleController {
         this.setWarmth(1);
         this.host.lights.hemi.intensity *= 0.6;
       }
-      this.camOverride = { x: p.x * 0.4 - 0.6, dist: 13, lookY: 2.3, camY: 3.4 };
+      this.camOverride = { x: p.x * 0.4 - 0.6, dist: 13, lookY: 2.3, camY: 3.4, minHalfW: 3.6 };
     } else if (this.phase === 'ending') {
       const u = Math.min(1, t / APOLOGY.endingTime);
       const show = this.endingShow;
@@ -574,7 +575,7 @@ export class BattleController {
         this.setWarmth(0.6);
         bg.lerp(new Color('#F7E8BE'), Math.min(1, u * 2));
         this.forgiveFx?.update(u, pl.x, { x: p.x, y: p.lift + headCenterY() + 0.8 });
-        this.camOverride = { x: 0, dist: 15, lookY: 3.2, camY: 4.0 };
+        this.camOverride = { x: 0, dist: 15, lookY: 3.2, camY: 4.0, minHalfW: 4.2 };
       } else if (show === 'leave') {
         p.setFade(1);
         p.setStance(true, -1);
@@ -589,7 +590,7 @@ export class BattleController {
         L.key.intensity *= u > 0.55 ? 0 : 1;
         bg.lerp(new Color('#2E2A36'), smooth((u - 0.3) / 0.3));
         this.leaveFx?.update(u, pl.x);
-        this.camOverride = { x: Math.max(-5.5, pl.x * 0.6), dist: 17, lookY: 3, camY: 4 };
+        this.camOverride = { x: Math.max(-5.5, pl.x * 0.6), dist: 17, lookY: 3, camY: 4, minHalfW: 5 };
       } else if (show === 'later') {
         // 傍晚：木偶在角落安靜坐著，玩家坐在舞台邊緣
         p.setFade(1);
@@ -602,7 +603,7 @@ export class BattleController {
         this.setWarmth(1);
         this.host.lights.hemi.intensity *= 0.75;
         bg.lerp(new Color('#E8A27E'), smooth(u / 0.6));
-        this.camOverride = { x: 1.4, dist: 22, lookY: 2.4, camY: 4.4 };
+        this.camOverride = { x: 1.4, dist: 22, lookY: 2.4, camY: 4.4, minHalfW: 5.4 };
       }
     }
     p.update(dt, { walls: [GAME.wallL - 6, GAME.wallR], reducedMotion: prefersReducedMotion() });
@@ -618,7 +619,9 @@ export class BattleController {
     const z = pl.rig.root.position.z;
     pl.pose(frameDt, { x: p.x, faceY: p.lift + headCenterY() * p.squashScaleY, faceFront: PART_DEFS.head.size[2] / 2 });
     pl.rig.root.position.z = z;
-    const f = this.camOverride ?? computeFrame({
+    const o = this.camOverride;
+    const tv = Math.tan(((this.host.camera.fov / 2) * Math.PI) / 180);
+    const f = o ? { ...o, dist: Math.max(o.dist, (o.minHalfW ?? 0) / (tv * this.host.camera.aspect)) } : computeFrame({
       aspect: this.host.camera.aspect,
       fov: this.host.camera.fov,
       actors: [

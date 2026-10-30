@@ -53,9 +53,11 @@ for (const s of SIZES) {
     await page.waitForTimeout(1500);
     await page.getByTestId('worthy').click();
     await expect(page.getByTestId('ending-choices')).toBeVisible();
+    await page.waitForTimeout(900);
     await page.screenshot({ path: `${DIR}/${s.name}-07-choices.png` });
     await page.getByTestId('ending-forgive').click();
     await expect(page.getByTestId('ending-text')).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(900);
     await page.screenshot({ path: `${DIR}/${s.name}-08-forgive.png` });
     await page.getByTestId('ending-continue').click();
     await page.waitForTimeout(2500);
@@ -63,6 +65,7 @@ for (const s of SIZES) {
     await page.getByTestId('breath-skip').click();
     await page.getByRole('button', { name: '不用了' }).click();
     await page.getByTestId('anger-after-range').fill('8');
+    await page.waitForTimeout(900);
     await page.screenshot({ path: `${DIR}/${s.name}-10-anger.png` });
   });
 }
