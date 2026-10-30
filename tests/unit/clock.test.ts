@@ -26,6 +26,28 @@ describe('回合計時', () => {
     f.advance(5_000);
     expect(c.remaining()).toBeCloseTo(20);
   });
+  it('繼續打：延長 60 秒，已用時間不變', () => {
+    const f = fake();
+    const c = new RoundClock(180, f.now);
+    c.start();
+    f.advance(165_000);
+    c.pause();
+    c.extend(60);
+    expect(c.lengthSec).toBe(240);
+    expect(c.remaining()).toBeCloseTo(75);
+    c.resume();
+    f.advance(60_000);
+    expect(c.remaining()).toBeCloseTo(15);
+  });
+  it('時間到之後不能再延長', () => {
+    const f = fake();
+    const c = new RoundClock(10, f.now);
+    c.start();
+    f.advance(11_000);
+    expect(c.checkExpired()).toBe(true);
+    c.extend(60);
+    expect(c.lengthSec).toBe(10);
+  });
   it('時間到只觸發一次', () => {
     const f = fake();
     const c = new RoundClock(3, f.now);

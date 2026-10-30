@@ -4,10 +4,14 @@ import { dispatch } from '../state/app';
 import { devRound, markTutorialSeen, tutorialSeen, updateBattle, useBattleOptions } from '../state/battle';
 import { Segmented } from '../ui/Segmented';
 import { Tutorial } from '../ui/Tutorial';
+import { useSession } from '../state/session';
+import { fillPronouns } from '../state/text';
 
-/** 開戰準備：難度、回合長度、短版操作教學。 */
+/** 開戰準備：難度、回合說明、短版操作教學。 */
 export function PrepScreen() {
   const o = useBattleOptions();
+  const session = useSession();
+  const t = (x: string) => fillPronouns(x, session.self, session.other);
   const [showTutorial, setShowTutorial] = useState(() => !tutorialSeen());
   const dev = devRound();
 
@@ -34,12 +38,7 @@ export function PrepScreen() {
       </header>
       <section className="prep-card">
         <Segmented<'easy'> label="難度" value={o.difficulty} onChange={(difficulty) => updateBattle({ difficulty })} options={[{ value: 'easy', label: '簡單' }]} />
-        <Segmented<string>
-          label="回合長度"
-          value={String(o.roundLength)}
-          onChange={(v) => updateBattle({ roundLength: Number(v) })}
-          options={ROUND.lengths.map((s) => ({ value: String(s), label: `${s / 60} 分鐘` }))}
-        />
+        <p className="note" data-testid="round-note">{t(`每回合 ${ROUND.defaultLength / 60} 分鐘。剩 ${ROUND.finisherAskAt} 秒時，可以選擇給{他}致命一擊，或再打 ${ROUND.extendBy / 60} 分鐘。`)}</p>
         {dev != null && <p className="note dev">開發測試：這次回合改為 {dev} 秒。</p>}
         <p className="note">簡單模式：木偶不會走動，每隔一陣子會出一拳，頭上冒出「！」時閃開就好。沒有輸的結局。</p>
         <div className="prep-actions">

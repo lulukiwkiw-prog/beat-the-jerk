@@ -8,7 +8,7 @@ export class RoundClock {
   private fired = false;
 
   constructor(
-    readonly lengthSec: number,
+    public lengthSec: number,
     private readonly now: () => number = () => performance.now(),
   ) {}
 
@@ -45,6 +45,12 @@ export class RoundClock {
     this.fired = true;
     this.pause();
     return true;
+  }
+
+  /** 延長回合（「繼續打」再 1 分鐘）。時間到之後不可延長。 */
+  extend(sec: number) {
+    if (this.fired) return;
+    this.lengthSec += sec;
   }
 
   /** 提前結束（不再觸發時間到）。 */

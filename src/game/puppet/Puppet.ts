@@ -323,6 +323,15 @@ export class Puppet {
     this.decals.add(this.meshes.torso, 'shoe', 0.55, 0.75, d / 2, r.decalLife, [w * 0.45, h * 0.35]);
   }
 
+  /** 致命一擊：被光波轟上天（摔回地面時速度夠大就噴飛）。 */
+  blast(vx: number, vy: number, dir: number) {
+    this.airborne = true;
+    this.vx = vx;
+    this.vy = vy;
+    this.spin.vel = -dir * 9;
+    this.sy.vel += 8;
+  }
+
   /** 被踩扁：整個壓成一片，時間到彈回。 */
   flatten() {
     this.flatT = R.flatten.time;
@@ -386,6 +395,11 @@ export class Puppet {
       this.meshes.head.add(b);
       this.bucket = b;
     }
+  }
+
+  /** 頭暈（不套水桶）：被擊倒後坐在地上晃 */
+  daze(sec: number) {
+    this.stunT = sec;
   }
 
   get isStunned() {

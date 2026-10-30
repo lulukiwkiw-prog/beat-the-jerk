@@ -3,9 +3,10 @@ import { CAMERA, GAME } from '../../config/game.config';
 import { EFFECTS } from '../../config/effects.config';
 import { H, MOVE_SETS, MOVES, PLAYER, type DashMove, type MeleeMove, type MoveId, type MoveKind, type ThrowMove } from '../../config/moves.config';
 import { PUPPET } from '../../config/puppet.config';
-import { EASY_AI, ROUND } from '../../config/round.config';
+import { EASY_AI, FINISHER, ROUND } from '../../config/round.config';
 import { prefersReducedMotion, settingsStore, vibrate } from '../../state/settings';
 import { ComicWords } from '../effects/comicWords';
+import { EnergyBeam } from '../effects/beam';
 import { Particles } from '../effects/particles';
 import { EasyAI } from '../enemy/easyAI';
 import { BattleInput } from '../engine/input';
@@ -38,7 +39,7 @@ const BIG_HITS = new Set<MoveId>(['uppercut', 'shoe', 'stomp', 'spin', 'flykick'
 /** 收尾時間背景轉暖的目標色 */
 const WARM_BACKGROUND = '#EFD9C2';
 
-export type BattlePhase = 'countdown' | 'fight' | 'ended' | 'apology' | 'worthy' | 'ending';
+export type BattlePhase = 'ask' | 'finisher' | 'countdown' | 'fight' | 'ended' | 'apology' | 'worthy' | 'ending';
 /** 結局演出：1 原諒、2 到此為止、5 還沒準備好 */
 export type EndingShow = 'forgive' | 'leave' | 'later';
 
@@ -70,6 +71,8 @@ export interface HudState {
   cooldowns: Partial<Record<MoveId, number>>;
   countdown: string;
   paused: boolean;
+  /** 致命一擊演出的字幕：title＝開場標題、ko＝擊倒 */
+  cine: '' | 'title' | 'ko';
 }
 
 export interface BattleEvents {
@@ -111,10 +114,15 @@ export class BattleController {
   private gameTime = 0;
   private phaseTime = 0;
   private endNotified = false;
-  private windDownShown = false;
+  /** 已經問過致命一擊的回合長度（每次延長後在剩 15 秒時再問一次） */
+  private askedLen = 0;
+  /** 致命一擊演出：已觸發到第幾個節點、目前鏡頭、對手所在方向、連打計數 */
+  private fin = { step: 0, shot: -1, side: 1 as 1 | -1, aura: 0, koAt: -1 };
+  private beam: EnergyBeam | null = null;
+  private camCut = false;
   private shake = 0;
   private flash = 0;
-  private cam = { x: 0, dist: 18, lookY: CAMERA.lookY, camY: CAMERA.baseY };
+  private cam = { x: 0, dist: 18, lookY: CAMERA.lookY, camY: CAMERA.baseY, yaw: 0 };
   private camInit = false;
   private lastHud = '';
   private disposed = false;
@@ -131,7 +139,7 @@ export class BattleController {
   private leaveFx: LeaveFx | null = null;
   private walkFrom = { puppet: 0, player: 0 };
   /** 演出用鏡頭；minHalfW＝左右至少要看到的半寬，窄螢幕會自動拉遠 */
-  private camOverride: { x: number; dist: number; lookY: number; camY: number; minHalfW?: number } | null = null;
+  private camOverride: { x: number; dist: number; lookY: number; camY: number; minHalfW?: number; yaw?: number; rate?: number } | null = null;
 
   constructor(
     private readonly dom: BattleDom,
@@ -154,7 +162,7 @@ export class BattleController {
     this.particles = new Particles(this.host.scene);
     this.words = new ComicWords(dom.fx);
     this.shoes = new Projectiles(this.host.scene);
-    this.input = new BattleInput(() => this.ev.onRequestPause());
+    this.input = new BattleInput(() => this.requestPause());
     this.clock = new RoundClock(roundLength);
     document.addEventListener('visibilitychange', this.onVis);
     this.restart();
@@ -165,8 +173,13 @@ export class BattleController {
   }
 
   private onVis = () => {
-    if (document.hidden) this.ev.onRequestPause();
+    if (document.hidden) this.requestPause();
   };
+
+  /** 詢問致命一擊與終結技演出時不開暫停選單（詢問本身已經停住計時） */
+  private requestPause() {
+    if (this.phase === 'fight' || this.phase === 'countdown') this.ev.onRequestPause();
+  }
 
   /** 重新開始：重設分數、連擊、計時、角色、冷卻、投射物、粒子。 */
   restart() {
@@ -187,7 +200,10 @@ export class BattleController {
     this.phaseTime = 0;
     this.paused = false;
     this.endNotified = false;
-    this.windDownShown = false;
+    this.askedLen = 0;
+    this.player.powerUp = this.player.thrust = 0;
+    this.beam?.dispose();
+    this.beam = null;
     this.shake = this.flash = 0;
     this.camInit = false;
     this.input.setEnabled(false);
@@ -248,19 +264,18 @@ export class BattleController {
     return this.phase === 'fight' && !this.paused;
   }
 
-  private fxScale(): number {
-    const rem = this.clock.remaining();
-    if (this.phase !== 'fight' || rem > ROUND.windDown) return 1;
-    const k = 1 - rem / ROUND.windDown;
-    return 1 - (1 - ROUND.windDownMinFx) * k;
-  }
-
   private update(dt: number) {
     if (this.paused || this.disposed) return;
     this.gameTime += dt;
     this.phaseTime += dt;
     if (SHOW_PHASES.includes(this.phase)) {
       this.updateShow(dt);
+      return;
+    }
+    // 詢問致命一擊：整個畫面停住等玩家選
+    if (this.phase === 'ask') return;
+    if (this.phase === 'finisher') {
+      this.updateFinisher(dt);
       return;
     }
     this.handleDialogue(this.director.update(this.gameTime));
@@ -273,13 +288,10 @@ export class BattleController {
         this.ev.onBanner('開打！');
       }
     } else if (this.phase === 'fight') {
-      const rem = this.clock.remaining();
-      if (rem <= ROUND.windDown && !this.windDownShown && this.roundLength > ROUND.windDown) {
-        this.windDownShown = true;
-        this.ev.onBanner('最後 30 秒，慢慢收拳');
-      }
-      if (rem <= ROUND.windDown) this.setWarmth(1 - rem / ROUND.windDown);
-      if (this.clock.checkExpired()) this.endRound();
+      // 剩 15 秒：問要不要給致命一擊（回合本身短於 15 秒的開發測試不問）
+      const len = this.clock.lengthSec;
+      if (len > ROUND.finisherAskAt && this.askedLen !== len && this.clock.remaining() <= ROUND.finisherAskAt) this.askFinisher();
+      else if (this.clock.checkExpired()) this.endRound();
     } else if (this.phase === 'ended' && !this.endNotified && this.phaseTime >= ROUND.endDelay) {
       this.endNotified = true;
       this.ev.onEnd(this.result());
@@ -429,7 +441,7 @@ export class BattleController {
     this.handleDialogue(this.director.onHit(this.gameTime));
 
     const big = BIG_HITS.has(id) || (id === 'club' && segment === 2);
-    const s = this.fxScale();
+    const s = 1;
     this.particles.burst(at, 'star', Math.round((big ? 6 : 3) * s));
     this.particles.burst(at, 'chip', Math.round((big ? 10 : 5) * s));
     this.words.add(m.words[segment % m.words.length], at.x, at.y + 0.6, '#E8392B', 1);
@@ -463,7 +475,7 @@ export class BattleController {
     const p = this.puppet;
     if (e.type === 'landHard') {
       this.words.add('嘩啦！', p.x, 1.2, '#FFC63A', 1.1);
-      this.kick(this.fxScale());
+      this.kick(1);
     } else if (e.type === 'land') {
       this.words.add('咚！', p.x, 0.8, '#FFC63A', 0.8);
     } else if (e.type === 'wall') {
@@ -509,6 +521,184 @@ export class BattleController {
     this.emitHud(true);
   }
 
+  // ---------- 致命一擊 ----------
+  /** 剩 15 秒：停住計時與畫面，問玩家要不要給致命一擊。 */
+  private askFinisher() {
+    this.askedLen = this.clock.lengthSec;
+    this.phase = 'ask';
+    this.clock.pause();
+    this.input.setEnabled(false);
+    this.ai.interrupt();
+    this.puppet.setAiPose('idle', -1);
+    this.dom.alert.hidden = true;
+    this.emitHud(true);
+  }
+
+  /** 「繼續打」：回合再延長 1 分鐘，剩 15 秒時再問一次。 */
+  chooseContinue() {
+    if (this.phase !== 'ask') return;
+    this.clock.extend(ROUND.extendBy);
+    this.phase = 'fight';
+    this.clock.resume();
+    this.input.setEnabled(true);
+    this.ev.onBanner(`再打 ${ROUND.extendBy / 60} 分鐘！`);
+    this.emitHud(true);
+  }
+
+  /** 「致命一擊」：集氣、推出正義光波把對手轟上天，摔回地面擊倒後直接進道歉。 */
+  chooseFinisher() {
+    if (this.phase !== 'ask') return;
+    this.handleDialogue(this.director.stop());
+    this.clock.stop();
+    this.phase = 'finisher';
+    this.showT = 0;
+    this.input.setEnabled(false);
+    this.shoes.clear();
+    this.ai.reset();
+    const p = this.puppet;
+    const pl = this.player;
+    p.forceReassemble();
+    p.clearStatus();
+    p.setAiPose('idle', -1);
+    pl.attack = null;
+    pl.stun = pl.dodge = 0;
+    pl.powerUp = 1;
+    pl.thrust = 0;
+    const side = (Math.sign(p.x - pl.x) || 1) as 1 | -1;
+    // 兩人移到場中央兩側：鏡頭不會被角柱擋住，也留出光波與轟飛的空間
+    p.x = side * FINISHER.standX;
+    pl.x = -side * FINISHER.standX;
+    pl.facing = side;
+    p.vx = 0;
+    this.beam?.dispose();
+    this.beam = new EnergyBeam(this.host.scene);
+    this.fin = { step: 0, shot: -1, side, aura: 0, koAt: -1 };
+    this.emitHud(true);
+  }
+
+  private updateFinisher(dt: number) {
+    const F = FINISHER;
+    const p = this.puppet;
+    const pl = this.player;
+    const fin = this.fin;
+    const side = fin.side;
+    const beam = this.beam!;
+    // 光波打中的瞬間放慢動作
+    const slow = this.showT >= F.slowFrom && this.showT < F.slowTo ? F.slowRate : 1;
+    const sdt = dt * slow;
+    this.showT += sdt;
+    const t = this.showT;
+    const reduced = prefersReducedMotion();
+    // 雙手之間（光球、光柱的起點）
+    const hands = pl.rig.gloveL.getWorldPosition(new Vector3()).add(pl.rig.gloveR.getWorldPosition(new Vector3())).multiplyScalar(0.5);
+
+    if (t < F.fire) {
+      // 集氣：光球越來越大，周圍冒星星
+      beam.charge(hands, F.ballMax * Math.min(1, t / (F.fire * 0.85)), sdt);
+      fin.aura -= sdt;
+      if (fin.aura <= 0) {
+        fin.aura = 0.1;
+        const a = Math.random() * Math.PI * 2;
+        this.particles.burst(new Vector3(pl.x + Math.cos(a) * 1.4, 0.4 + Math.random() * 4.5, Math.sin(a) * 1.4), 'star', 2);
+      }
+      if (t > 0.5 && fin.step === 0) {
+        fin.step = 1;
+        this.words.add('正義……', pl.x, 6, '#FFC63A', 0.9);
+      }
+    } else {
+      pl.powerUp = 0;
+      pl.thrust = Math.min(1, (t - F.fire) / 0.12);
+      if (fin.step < 2) {
+        fin.step = 2;
+        this.words.add('光波————！', pl.x + side * 2, 6.2, '#FFC63A', 1.3);
+        this.kick(0.8);
+        this.flash = Math.max(this.flash, reduced ? 0.15 : 0.5);
+      }
+      // 光柱：射出後延伸到對手；打中後末端跟著被轟飛的對手
+      const center = new Vector3(p.x, p.lift + PUPPET.height * 0.55, 0);
+      const reach = Math.min(1, (t - F.fire) / (F.hit - F.fire));
+      const to = hands.clone().lerp(center, reach);
+      const fade = t < F.beamEnd ? 1 : Math.max(0, 1 - (t - F.beamEnd) / 0.35);
+      beam.fire(hands, to, F.beamRadius, fade, sdt);
+      if (fade > 0 && Math.random() < 0.5) this.particles.burst(new Vector3(pl.x + side * (1 + Math.random() * 2), 0.3, (Math.random() - 0.5) * 2), 'chip', 1);
+    }
+    if (fin.step === 2 && t >= F.hit) {
+      fin.step = 3;
+      p.blast(side * F.blastVx, F.blastVy, side);
+      this.particles.burst(new Vector3(p.x, 3, 0.6), 'star', 14);
+      this.particles.burst(new Vector3(p.x, 2, 0.6), 'chip', 16);
+      this.words.add('轟————！', p.x, 4.5, '#E8392B', 1.4);
+      this.kick(1.3);
+      this.flash = Math.max(this.flash, reduced ? 0.25 : 0.9);
+    }
+    if (fin.step === 3 && p.vy <= 0 && p.airborne) {
+      // 飛到最高點：閃一下變成天邊的星星
+      fin.step = 4;
+      this.particles.burst(new Vector3(p.x, p.lift + 2.4, 0.6), 'star', 12);
+      this.words.add('☆ 閃～', p.x + side * 1.2, p.lift + 3.4, '#FFFFFF', 1);
+    }
+    if (fin.step === 5 && fin.koAt < 0) fin.koAt = t + 0.35;
+    if (fin.step >= 4 && fin.step < 6 && ((fin.koAt >= 0 && t >= fin.koAt) || t >= F.koLatest)) {
+      fin.step = 6;
+      this.ledger.bonus(F.score);
+      this.words.add(`+${F.score} 致命一擊`, p.x * 0.3, 6, '#FFC63A', 1.1, 'score');
+      for (let i = 0; i < 4; i++) this.particles.burst(new Vector3(p.x + (Math.random() - 0.5) * 3, 1 + Math.random() * 3, 0.6), 'star', 8);
+      this.kick(1);
+    }
+
+    // 運鏡：每個鏡頭切一次（cut），鏡頭內平滑推移
+    const shot = t < F.fire ? 0 : t < F.hit + 0.25 ? 1 : fin.step < 5 ? 2 : t < (fin.koAt < 0 ? F.koLatest : fin.koAt) + 0.8 ? 3 : 4;
+    if (shot !== fin.shot) {
+      fin.shot = shot;
+      this.camCut = true;
+    }
+    if (shot === 0) {
+      // 低角度特寫集氣，慢慢推近
+      const u = Math.min(1, t / F.fire);
+      this.camOverride = { x: pl.x + side * 0.5, dist: 8.5 - 2 * u, lookY: 2.7, camY: 1.6, yaw: 0.55 * side, rate: 6 };
+    } else if (shot === 1) {
+      // 越肩鏡頭：從玩家身後看光波射向對手
+      this.camOverride = { x: pl.x + side * 1.2, dist: 7.5, lookY: 2.6, camY: 6.4, yaw: -0.6 * side, rate: 8 };
+    } else if (shot === 2) {
+      // 仰角跟著被轟上天的對手
+      this.camOverride = { x: (pl.x + p.x) / 2, dist: 19, lookY: Math.max(3.4, p.lift * 0.9 + 2), camY: 0.8, yaw: 0.35 * side, rate: 4, minHalfW: 4.5 };
+    } else if (shot === 3) {
+      // 摔回地面：正面廣角
+      this.camOverride = { x: p.x, dist: 15, lookY: 2.2, camY: 4, yaw: 0, rate: 4, minHalfW: 5 };
+    } else {
+      // 收尾：慢慢環繞、拉遠
+      const from = (fin.koAt < 0 ? F.koLatest : fin.koAt) + 0.8;
+      const u = Math.min(1, (t - from) / Math.max(0.1, F.total - from));
+      this.camOverride = { x: p.x * 0.6 + pl.x * 0.4, dist: 15 + 6 * u, lookY: 2.4, camY: 4.4 + 1.6 * u, yaw: (0.55 - 1.0 * u) * side, rate: 2.5, minHalfW: 5 };
+    }
+
+    for (const e of p.update(sdt, { walls: [GAME.wallL, GAME.wallR], reducedMotion: reduced })) {
+      this.onPuppetEvent(e);
+      if (e.type === 'landHard' || e.type === 'land') fin.step = Math.max(fin.step, 5);
+      // 組回來後被擊倒：坐在地上頭暈
+      if (e.type === 'reassembled') {
+        p.setPoseMode('sit');
+        p.daze(F.total);
+      }
+    }
+    pl.update(sdt, 0, p.x, false);
+    this.particles.update(sdt);
+    this.words.update(dt);
+    this.shake = Math.max(0, this.shake - dt * CAMERA.shakeDecay);
+    this.flash = Math.max(0, this.flash - dt * EFFECTS.flashDecay);
+    this.emitHud(false);
+    if (t >= F.total) {
+      this.camOverride = null;
+      this.camCut = true;
+      this.beam?.dispose();
+      this.beam = null;
+      pl.thrust = 0;
+      this.endRound(false);
+      this.endNotified = true;
+      this.ev.onEnd(this.result());
+    }
+  }
+
   // ---------- 道歉與結局演出 ----------
   private clearShow() {
     this.forgiveFx?.dispose();
@@ -518,6 +708,9 @@ export class BattleController {
     this.endingShow = null;
     this.camOverride = null;
     this.player.script = null;
+    this.player.powerUp = this.player.thrust = 0;
+    this.beam?.dispose();
+    this.beam = null;
     this.player.rig.root.position.z = 0;
     this.host.lights.hemi.visible = this.host.lights.key.visible = this.host.lights.fill.visible = true;
   }
@@ -537,6 +730,7 @@ export class BattleController {
     const p = this.puppet;
     p.forceReassemble();
     p.clearStatus();
+    p.setPoseMode('stand');
     p.setAiPose('idle', -1);
     p.setStance(false);
     this.walkFrom = { puppet: p.x, player: this.player.x };
@@ -655,16 +849,21 @@ export class BattleController {
         { x: p.x, halfWidth: PUPPET.halfWidth + (p.airborne ? 0.6 : 0), top: p.lift + PUPPET.height },
       ],
     });
-    const k = this.camInit ? Math.min(1, frameDt * (this.camOverride ? 1.4 : CAMERA.followRate)) : 1;
+    const k = this.camInit && !this.camCut ? Math.min(1, frameDt * (o ? (o.rate ?? 1.4) : CAMERA.followRate)) : 1;
+    const cut = this.camCut;
     this.camInit = true;
+    this.camCut = false;
     this.cam.x += (f.x - this.cam.x) * k;
-    const kd = f.dist > this.cam.dist ? Math.min(1, frameDt * 10) : k;
+    const kd = cut ? 1 : f.dist > this.cam.dist ? Math.min(1, frameDt * 10) : k;
+    this.cam.yaw += ((o?.yaw ?? 0) - this.cam.yaw) * k;
     this.cam.dist += (f.dist - this.cam.dist) * kd;
     this.cam.lookY += (f.lookY - this.cam.lookY) * kd;
     this.cam.camY += (f.camY - this.cam.camY) * kd;
     const sh = this.shake;
     const cam = this.host.camera;
-    cam.position.set(this.cam.x + (Math.random() - 0.5) * sh, this.cam.camY + (Math.random() - 0.5) * sh, this.cam.dist);
+    // yaw：繞著注視點水平轉動（電影感運鏡）；平常為 0＝正面
+    const yaw = this.cam.yaw;
+    cam.position.set(this.cam.x + Math.sin(yaw) * this.cam.dist + (Math.random() - 0.5) * sh, this.cam.camY + (Math.random() - 0.5) * sh, Math.cos(yaw) * this.cam.dist);
     cam.lookAt(this.cam.x, this.cam.lookY, 0);
     this.words.layout(cam, size.width, size.height);
     if (this.bubble.visible) {
@@ -697,6 +896,7 @@ export class BattleController {
       cooldowns: cds,
       countdown: cd,
       paused: this.paused,
+      cine: this.phase !== 'finisher' ? '' : this.showT < FINISHER.fire ? 'title' : this.fin.step >= 6 ? 'ko' : '',
     };
     const key = JSON.stringify(h);
     if (force || key !== this.lastHud) {
@@ -728,6 +928,7 @@ export class BattleController {
       hits: this.hits,
       showT: this.showT,
       flat: this.puppet.isFlat,
+      clockLength: this.clock.lengthSec,
       stunned: this.puppet.isStunned,
       bucket: this.puppet.hasBucket,
       accordion: this.puppet.isAccordion,

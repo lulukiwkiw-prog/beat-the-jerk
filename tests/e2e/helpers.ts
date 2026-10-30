@@ -51,6 +51,7 @@ export interface BattleDebug {
   stunned: boolean;
   bucket: boolean;
   accordion: boolean;
+  clockLength: number;
 }
 
 export const bt = (page: Page) => ({

@@ -17,10 +17,13 @@ import { openSettings, useSettingsOpen } from '../ui/SettingsPanel';
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 const INITIAL: HudState = {
-  phase: 'countdown', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false,
+  phase: 'countdown', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false, cine: '',
 };
 
 /** 步驟 2～結尾：決鬥、道歉、結尾都在同一個 3D 擂台場景裡 */
+/** 可以暫停、提前結束的階段 */
+const LIVE_PHASES: HudState['phase'][] = ['countdown', 'fight'];
+
 export function BattleScreen() {
   const screen = useScreen();
   const session = useSession();
@@ -143,8 +146,31 @@ export function BattleScreen() {
           <div className="ai-alert" ref={alertRef} hidden aria-hidden="true">！</div>
           <div className="bubble battle-bubble" ref={bubbleRef} hidden data-testid="battle-bubble" />
 
+          {hud.phase === 'finisher' && (
+            <div className="cine" aria-live="polite" data-testid="finisher-cine">
+              <div className="cine-bar top" />
+              <div className="cine-bar bottom" />
+              {hud.cine === 'title' && <div className="cine-title">致命一擊</div>}
+              {hud.cine === 'ko' && <div className="cine-title ko">K.O.!</div>}
+            </div>
+          )}
+          {hud.phase === 'ask' && !inStory && (
+            <div className="overlay finisher-ask" data-testid="finisher-ask">
+              <p className="ask-time">剩 {hud.timeLeft} 秒</p>
+              <h2>{t('要給{他}致命一擊嗎？')}</h2>
+              <div className="btn-row center">
+                <button type="button" className="btn primary big" onClick={() => ctrl.current?.chooseFinisher()} data-testid="finisher-yes">
+                  致命一擊！
+                </button>
+                <button type="button" className="btn big" onClick={() => ctrl.current?.chooseContinue()} data-testid="finisher-more">
+                  繼續打（再 {ROUND.extendBy / 60} 分鐘）
+                </button>
+              </div>
+            </div>
+          )}
+
           {!inStory && (
-          <div className="hud">
+          <div className={`hud ${hud.phase === 'finisher' ? 'hidden-cine' : ''}`}>
             <div className="hud-left">
               <div className="chip-stat">時間<b data-testid="hud-time">{fmt(hud.timeLeft)}</b></div>
               <div className="chip-stat">分數<b data-testid="hud-score">{hud.score}</b></div>
@@ -152,7 +178,7 @@ export function BattleScreen() {
               <div className="chip-stat">最高<b>{hud.maxCombo}</b></div>
             </div>
             <div className="hud-right">
-              <button type="button" className="icon-btn" aria-label="暫停" onClick={() => dispatch('PAUSE')} disabled={hud.phase === 'ended'} data-testid="pause">
+              <button type="button" className="icon-btn" aria-label="暫停" onClick={() => dispatch('PAUSE')} disabled={!LIVE_PHASES.includes(hud.phase)} data-testid="pause">
                 ❚❚
               </button>
               <button type="button" className="icon-btn" aria-label="設定" onClick={openSettings}>
@@ -310,7 +336,7 @@ export function BattleScreen() {
                 if (screenStore.get() === 'battle') dispatch('PAUSE');
                 setConfirmEnd(true);
               }}
-              disabled={hud.phase === 'ended'}
+              disabled={!LIVE_PHASES.includes(hud.phase)}
               data-testid="end-early"
             >
               {t('打夠了，聽{他}說')}

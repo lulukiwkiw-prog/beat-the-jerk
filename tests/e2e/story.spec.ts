@@ -137,7 +137,7 @@ test('前後氣憤值並排顯示；現在 ≥ 7 或高於開打前才顯示支�
 });
 
 test('「打夠了，聽他說」：先確認一次，提前進入道歉', async ({ page }) => {
-  await quickBattle(page, 60);
+  await quickBattle(page, 300);
   await page.getByTestId('end-early').click();
   await expect(page.getByTestId('confirm-end')).toBeVisible();
   await page.getByRole('button', { name: '繼續打' }).click();
@@ -149,7 +149,7 @@ test('「打夠了，聽他說」：先確認一次，提前進入道歉', async
 });
 
 test('戰鬥中沒有賤話開關、跳過挑釁鈕；被打中才說想聽的話', async ({ page }) => {
-  await quickBattle(page, 60, async (p) => {
+  await quickBattle(page, 300, async (p) => {
     await p.getByTestId('field-d-0').fill('不是你的錯');
   });
   await expect(page.getByTestId('chatter')).toHaveCount(0);

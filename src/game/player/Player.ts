@@ -24,6 +24,9 @@ export class Player {
   dodge = 0;
   dodgeCd = 0;
   stun = 0;
+  /** 致命一擊演出：集氣（0～1）、推出光波（0～1） */
+  powerUp = 0;
+  thrust = 0;
   private hop = 0;
   private bob = 0;
   private bodyYaw = 0.85;
@@ -194,6 +197,11 @@ export class Player {
       face = this.facing * (Math.PI / 2);
       yawRate = 30;
     }
+    if (this.powerUp > 0 || this.thrust > 0) {
+      // 側身蓄力，推出時轉正對準對手
+      face = this.facing * lerp(0.35, Math.PI / 2, smooth(this.thrust));
+      yawRate = 20;
+    }
     if (this.script) face = this.script.yaw;
     let stomp: number | null = null;
     if (a && a.move.id === 'stomp') {
@@ -290,6 +298,17 @@ export class Player {
         A.elR = A.elL = -0.3;
       }
     }
+    if ((this.powerUp > 0 || this.thrust > 0) && !a) {
+      // 集氣：雙手收到身側合成一個碗（手心之間是光球），蹲低、全身發抖；
+      // 推出：雙手往前伸直、手掌張開對準對手
+      const k = smooth(this.thrust);
+      A.shL = [lerp(0.35, -1.5, k), lerp(0.45, 0.12, k)];
+      A.shR = [lerp(0.25, -1.5, k), lerp(0.25, -0.12, k)];
+      A.elL = A.elR = lerp(-1.25, 0, k);
+      L.body.rotation.z = Math.sin(this.bob * 60) * 0.035 * Math.max(this.powerUp, this.thrust);
+      L.root.position.y -= 0.35 * Math.max(this.powerUp, k);
+      open = true;
+    }
     if (this.stun > 0) {
       A.shL = [-2.6, 0];
       A.shR = [-2.6, 0];
@@ -343,8 +362,9 @@ export class Player {
     L.elL.rotation.x = A.elL;
     L.elR.rotation.x = A.elR;
     const openArm = slap?.arm;
+    const beamHands = this.powerUp > 0 || this.thrust > 0;
     for (const [g, side] of [[L.gloveL, 'L'], [L.gloveR, 'R']] as const) {
-      const o = open && openArm === side;
+      const o = open && (beamHands || openArm === side);
       g.scale.set(o ? 0.5 : 1, o ? 1.35 : 1.05, o ? 1.2 : 1.1);
     }
     // 手上的武器：棍棒、鐵錘整招都拿著；投擲物出手後就不在手上

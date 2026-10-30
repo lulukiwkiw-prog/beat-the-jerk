@@ -287,6 +287,7 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
 .comic-word.score { -webkit-text-stroke: 4px var(--ink); font-size: calc((12px + 1.2vw) * var(--size, 1)); }
 .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(34, 38, 74, 0.62); color: #fff; text-align: center; padding: 16px; z-index: 6; }
 .overlay h2 { margin: 0; font-size: clamp(22px, 5vw, 32px); font-weight: 900; }
+.overlay .btn:not(.primary) { color: var(--ink); }
 
 .controls { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: end; padding-bottom: env(safe-area-inset-bottom, 0px); }
 .pad-left { display: grid; grid-template-columns: repeat(3, 64px); gap: 8px; }
@@ -442,4 +443,21 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
 
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
+}
+
+/* ---------- 致命一擊 ---------- */
+.finisher-ask { background: rgba(20, 16, 40, 0.72); }
+.finisher-ask h2 { font-size: clamp(24px, 6vw, 40px); color: var(--sun); -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; }
+.ask-time { margin: 0; font-weight: 900; font-family: var(--font-num); font-size: clamp(16px, 3.5vw, 22px); }
+.hud.hidden-cine { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.cine { position: absolute; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+.cine-bar { position: absolute; left: 0; right: 0; height: 11%; background: #08080c; animation: cine-in 0.45s ease-out both; }
+.cine-bar.top { top: 0; transform-origin: top; }
+.cine-bar.bottom { bottom: 0; transform-origin: bottom; }
+@keyframes cine-in { from { transform: scaleY(0); } }
+.cine-title { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-weight: 900; font-size: clamp(34px, 11vw, 96px); letter-spacing: 0.12em; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 0 24px rgba(255, 198, 58, 0.85); animation: cine-title 0.6s cubic-bezier(.2, 1.6, .4, 1) both; }
+.cine-title.ko { color: var(--sun); font-size: clamp(48px, 16vw, 140px); letter-spacing: 0.04em; text-shadow: 0 0 30px rgba(232, 57, 43, 0.9); }
+@keyframes cine-title { from { opacity: 0; transform: translateY(-50%) scale(2.2); } }
+@media (prefers-reduced-motion: reduce) {
+  .cine-title, .cine-bar { animation: none; }
 }

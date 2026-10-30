@@ -22,7 +22,9 @@ test('第一次進開戰準備會自動顯示操作教學，之後不再自動�
   // 困難模式在第 5 階段才有，現在只顯示簡單
   await expect(page.getByRole('radio', { name: '簡單' })).toBeVisible();
   await expect(page.getByRole('radio', { name: '困難' })).toHaveCount(0);
-  await expect(page.getByRole('radio', { name: '5 分鐘' })).toHaveAttribute('aria-checked', 'true');
+  // 回合固定 3 分鐘：沒有長度選項，只有說明
+  await expect(page.getByRole('radio', { name: '5 分鐘' })).toHaveCount(0);
+  await expect(page.getByTestId('round-note')).toContainText('每回合 3 分鐘');
 });
 
 test('命中得分、落空不得分、投射物碰撞、冷卻、暫停、時間到只結束一次', async ({ page }) => {
@@ -85,7 +87,7 @@ test('命中得分、落空不得分、投射物碰撞、冷卻、暫停、時�
 });
 
 test('上勾拳把木偶打上天，重摔落地噴飛再組回；噴飛中攻擊視為揮空', async ({ page }) => {
-  await toBattle(page, 30);
+  await toBattle(page, 300);
   const b = bt(page);
   const s = await b.battle();
   await b.setPlayerX(s.puppetX - 2.0);
@@ -101,7 +103,7 @@ test('上勾拳把木偶打上天，重摔落地噴飛再組回；噴飛中攻�
 });
 
 test('手機：移動與攻擊可同時觸控（多指）', async ({ page }) => {
-  await toBattle(page, 30);
+  await toBattle(page, 300);
   const b = bt(page);
   const x0 = (await b.battle()).playerX;
   // 第一根手指按住「往右」
@@ -120,7 +122,7 @@ test('手機：移動與攻擊可同時觸控（多指）', async ({ page }) => 
 });
 
 test('暫停中「重新開始」：歸零且噴飛零件立刻歸位', async ({ page }) => {
-  await toBattle(page, 30);
+  await toBattle(page, 300);
   const b = bt(page);
   const s = await b.battle();
   await b.setPlayerX(s.puppetX - 2.2);
@@ -135,13 +137,41 @@ test('暫停中「重新開始」：歸零且噴飛零件立刻歸位', async ({
   expect(r.timeLeft).toBeGreaterThan(25);
 });
 
-test('收尾時間：剩 30 秒時提示「最後 30 秒，慢慢收拳」', async ({ page }) => {
-  await toBattle(page, 33);
-  await expect(page.getByText('最後 30 秒，慢慢收拳')).toBeVisible({ timeout: 20_000 });
+test('剩 15 秒問致命一擊：暫停計時；「繼續打」延長 1 分鐘並在剩 15 秒再問；「致命一擊」演出後擊倒並進入道歉', async ({ page }) => {
+  test.setTimeout(300_000);
+  const errors = watchConsole(page);
+  await toBattle(page, 18);
+  const b = bt(page);
+  await expect(page.getByTestId('finisher-ask')).toBeVisible({ timeout: 30_000 });
+  const s1 = await b.battle();
+  expect(s1.phase).toBe('ask');
+  // 詢問中計時停住、不能暫停或提前結束
+  await page.waitForTimeout(1500);
+  expect((await b.battle()).timeLeft).toBeCloseTo(s1.timeLeft, 5);
+  await expect(page.getByTestId('pause')).toBeDisabled();
+  await expect(page.getByTestId('end-early')).toBeDisabled();
+  // 繼續打：延長 60 秒
+  await page.getByTestId('finisher-more').click();
+  await expect(page.getByTestId('finisher-ask')).toBeHidden();
+  expect((await b.battle()).clockLength).toBe(78);
+  await expect(page.getByText('再打 1 分鐘！')).toBeVisible();
+  // 剩 15 秒再問一次
+  await expect(page.getByTestId('finisher-ask')).toBeVisible({ timeout: 120_000 });
+  const before = (await b.battle()).score;
+  await page.getByTestId('finisher-yes').click();
+  await expect(page.getByTestId('finisher-cine')).toBeVisible();
+  await expect(page.getByText('致命一擊', { exact: true })).toBeVisible();
+  await expect(page.getByText('K.O.!')).toBeVisible({ timeout: 60_000 });
+  await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(before + 100);
+  await expect(page.getByTestId('apology')).toBeVisible({ timeout: 60_000 });
+  const r = await b.battle();
+  expect(r.scattered).toBe(false);
+  expect(r.projectiles).toBe(0);
+  expect(errors).toEqual([]);
 });
 
 test('踩扁：跳起來落下踩中得 40 分，木偶被壓扁後彈回', async ({ page }) => {
-  await toBattle(page, 60);
+  await toBattle(page, 300);
   const b = bt(page);
   await expect(page.locator('.moves .mv')).toHaveCount(6);
   const s = await b.battle();
@@ -158,7 +188,7 @@ test('踩扁：跳起來落下踩中得 40 分，木偶被壓扁後彈回', asyn
 test('階段 4 招式：迴旋踢、飛踢（逐幀判定只算一次）、棍棒 3 段、水桶套頭暈眩、桌椅碎成泡棉、鐵錘手風琴後噴飛', async ({ page }) => {
   test.setTimeout(240_000);
   const errors = watchConsole(page);
-  await toBattle(page, 180);
+  await toBattle(page, 600);
   const b = bt(page);
   const near = async (gap: number) => {
     // 等木偶回到地面、停下來再把玩家放到牠前方
