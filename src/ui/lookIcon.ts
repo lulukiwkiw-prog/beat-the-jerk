@@ -74,7 +74,7 @@ function overlayDesign(c: CanvasRenderingContext2D, id: AccessoryId) {
       e('#8E4A5A', 0.1, 4.05, 0.05, 0.07);
       break;
     case 'teruteru':
-      poly('#FFFFFF', [[-0.34, 3.5], [0.34, 3.5], [1.1, 2.7], [-1.1, 2.7]]);
+      poly('#FFFFFF', [[-0.66, 3.57], [0.66, 3.57], [1.09, 3.33], [-1.09, 3.33]]);
       e('#FFFFFF', 0, 4.21, 0.66, 0.66);
       e('#1E1E1E', -0.13, 4.3, 0.045, 0.045);
       e('#1E1E1E', 0.13, 4.3, 0.045, 0.045);
@@ -85,7 +85,7 @@ function overlayDesign(c: CanvasRenderingContext2D, id: AccessoryId) {
       c.stroke();
       e('rgba(244,143,177,.75)', -0.25, 4.15, 0.06, 0.04);
       e('rgba(244,143,177,.75)', 0.25, 4.15, 0.06, 0.04);
-      r('#E53935', 0, 3.55, 0.75, 0.08);
+      r('#E53935', 0, 3.58, 1.32, 0.06);
       break;
     case 'chickenHead':
       e('#FFD23F', 0, top - 0.05, 0.62, 0.3);

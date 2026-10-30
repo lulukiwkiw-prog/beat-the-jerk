@@ -45,6 +45,9 @@ export interface BattleDebug {
   decals: number;
   aiPhase: string;
   attacking: boolean;
+  bubble: string;
+  hits: number;
+  showT: number;
 }
 
 export const bt = (page: Page) => ({
@@ -80,4 +83,27 @@ export async function waitPhase(page: Page, phase: string, timeout = 30_000) {
     phase,
     { timeout },
   );
+}
+
+/** 道歉播完 →「值得聽到」→ 結尾選項 */
+export async function throughApology(page: Page) {
+  await expect(page.getByTestId('apology')).toBeVisible({ timeout: 60_000 });
+  const all = page.getByTestId('apology-all');
+  await page.waitForTimeout(300);
+  if (await all.isVisible()) await all.click();
+  await page.getByTestId('apology-next').click({ timeout: 40_000 });
+  await expect(page.getByTestId('worthy')).toBeVisible();
+  await page.waitForTimeout(3200);
+  await page.getByTestId('worthy').click();
+  await expect(page.getByTestId('ending-choices')).toBeVisible();
+}
+
+/** 從通緝單一路到開打（round 秒） */
+export async function quickBattle(page: Page, round: number, fill?: (p: Page) => Promise<void>) {
+  await page.goto(`/?round=${round}`);
+  await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
+  if (fill) await fill(page);
+  await page.getByTestId('go-paint').click();
+  await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
+  await startBattle(page);
 }

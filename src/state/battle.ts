@@ -35,6 +35,8 @@ export const markTutorialSeen = () => writeJSON(TUTORIAL_KEY, true);
 export interface RoundResult {
   score: number;
   maxCombo: number;
+  hits: number;
+  early: boolean;
 }
 export const resultStore = createStore<RoundResult | null>(null);
 export const useRoundResult = () => useStore(resultStore);

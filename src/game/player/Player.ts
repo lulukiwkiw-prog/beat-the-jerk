@@ -25,6 +25,8 @@ export class Player {
   private bob = 0;
   private bodyYaw = 0.85;
   private heldShoe: Group;
+  /** 結局演出時由劇本控制：朝向（弧度）、走路擺腿、坐下 */
+  script: { yaw: number; walking: boolean; sit: boolean } | null = null;
 
   constructor(readonly rig: PlayerRig) {
     this.heldShoe = buildShoe();
@@ -89,6 +91,10 @@ export class Player {
   }
 
   update(dt: number, move: -1 | 0 | 1, targetX: number, live: boolean) {
+    if (this.script) {
+      this.bob += dt;
+      return;
+    }
     if (this.buffered) {
       this.buffered.ttl -= dt;
       if (this.buffered.ttl <= 0 || !live) this.buffered = null;
@@ -141,6 +147,7 @@ export class Player {
       const elev = Math.atan2(dy, Math.max(0.2, reachX));
       slap = { arm: this.facing > 0 ? 'L' : 'R', shX: -(Math.PI / 2 + elev) * Math.min(1, inOut * 1.5) };
     }
+    if (this.script) face = this.script.yaw;
     this.bodyYaw += (face - this.bodyYaw) * Math.min(1, frameDt * yawRate);
     L.body.rotation.y = this.bodyYaw;
     L.body.rotation.z = this.stun > 0 ? 0.22 * this.facing : this.dodge > 0 ? 0.3 * this.facing : 0;
@@ -187,12 +194,27 @@ export class Player {
       A.shR = [-2.6, 0];
       A.elL = A.elR = -0.6;
     }
-    const step = Math.abs(this.vx) > 0.5 && this.dodge <= 0 ? Math.sin(this.bob * 14) * 0.45 : 0;
+    const walking = this.script ? this.script.walking : Math.abs(this.vx) > 0.5 && this.dodge <= 0;
+    const step = walking ? Math.sin(this.bob * 14) * 0.45 : 0;
     // 格鬥站姿：靠近對手的腳在前、另一腳在後（走路時改成擺腿）
     const frontR = this.facing > 0;
     const st = step === 0 ? PLAYER.stance : { front: 0, back: 0 };
     L.legL.rotation.x = step + (frontR ? st.back : -st.front);
     L.legR.rotation.x = -step + (frontR ? -st.front : st.back);
+    if (this.script?.sit) {
+      // 坐在舞台邊緣：雙腿往前、身體下沉、手放在膝上
+      L.legL.rotation.x = L.legR.rotation.x = -1.45;
+      L.root.position.y = -1.55;
+      A.shL = [-0.6, 0];
+      A.shR = [-0.6, 0];
+      A.elL = A.elR = -0.5;
+    }
+    if (this.script && !this.script.sit) {
+      // 演出時放下拳頭
+      A.shL = [0.05 + step * 0.4, 0];
+      A.shR = [0.05 - step * 0.4, 0];
+      A.elL = A.elR = -0.25;
+    }
     L.shL.rotation.set(A.shL[0], 0, A.shL[1]);
     L.shR.rotation.set(A.shR[0], 0, A.shR[1]);
     L.elL.rotation.x = A.elL;

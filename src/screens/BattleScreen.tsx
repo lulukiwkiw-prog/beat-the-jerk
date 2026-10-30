@@ -5,19 +5,31 @@ import { BattleController, type HudState } from '../game/battle/BattleController
 import { getPaintStore } from '../game/puppet/paintSurface';
 import { webglSupported } from '../game/three/renderer';
 import { dispatch, screenStore, useScreen } from '../state/app';
-import { battleStore, effectiveRoundLength, resultStore } from '../state/battle';
+import { battleStore, effectiveRoundLength, resultStore, updateBattle } from '../state/battle';
+import { enabledB, filledD, resetForNewJerk, sessionStore, useSession } from '../state/session';
+import { fillPronouns } from '../state/text';
+import { APOLOGY } from '../config/dialogue.config';
+import { ApologyOverlay, WorthyOverlay } from '../ui/flow/ApologyOverlay';
+import { EndingFlow } from '../ui/flow/EndingFlow';
 import { NoWebGL } from '../ui/NoWebGL';
 import { openSettings, useSettingsOpen } from '../ui/SettingsPanel';
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 const INITIAL: HudState = {
-  phase: 'countdown', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false,
+  phase: 'taunt', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false, chatter: false,
 };
 
-/** 步驟 2：決鬥 */
+/** 步驟 2～結尾：決鬥、道歉、結尾都在同一個 3D 擂台場景裡 */
 export function BattleScreen() {
   const screen = useScreen();
+  const session = useSession();
+  const t = (x: string) => fillPronouns(x, session.self, session.other);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [story, setStory] = useState<'none' | 'apology' | 'worthy'>('none');
+  const apologyStarted = useRef(false);
+  const inStory = screen === 'apology' || screen === 'ending';
   const settingsOpen = useSettingsOpen();
   const stageRef = useRef<HTMLDivElement>(null);
   const fxRef = useRef<HTMLDivElement>(null);
@@ -30,10 +42,11 @@ export function BattleScreen() {
   const paused = screen === 'paused';
 
   useEffect(() => {
-    if (!gl || !stageRef.current || !fxRef.current || !flashRef.current || !alertRef.current) return;
+    if (!gl || !stageRef.current || !fxRef.current || !flashRef.current || !alertRef.current || !bubbleRef.current) return;
+    const ses = sessionStore.get();
     let bannerTimer = 0;
     const c = new BattleController(
-      { stage: stageRef.current, fx: fxRef.current, flash: flashRef.current, alert: alertRef.current },
+      { stage: stageRef.current, fx: fxRef.current, flash: flashRef.current, alert: alertRef.current, bubble: bubbleRef.current },
       getPaintStore(),
       effectiveRoundLength(battleStore.get()),
       {
@@ -52,6 +65,7 @@ export function BattleScreen() {
           dispatch('END_ROUND');
         },
       },
+      { taunts: enabledB(ses), dLines: filledD(ses) },
     );
     ctrl.current = c;
     if (import.meta.env.DEV) {
@@ -64,6 +78,16 @@ export function BattleScreen() {
       ctrl.current = null;
     };
   }, [gl]);
+
+  // 進入道歉：轉場演出＋道歉稿
+  useEffect(() => {
+    if (screen === 'apology' && !apologyStarted.current) {
+      apologyStarted.current = true;
+      setConfirmEnd(false);
+      ctrl.current?.startApology();
+      setStory('apology');
+    }
+  }, [screen]);
 
   // 狀態機的暫停 ⇄ 戰鬥同步到控制器
   useEffect(() => {
@@ -104,8 +128,11 @@ export function BattleScreen() {
   const setKind = (k: MoveKind) => ctrl.current?.setKind(k);
   const moves = MOVE_SETS[hud.kind];
 
+  const early = resultStore.get()?.early ?? false;
+  const apologyDelay = APOLOGY.walkTime + APOLOGY.warmTime + (early ? APOLOGY.earlyExtraWarm : 0);
+
   return (
-    <main className="screen battle-screen">
+    <main className={`screen battle-screen ${inStory ? 'story-mode' : ''}`}>
       <div className="battle-wrap">
         <div className="battle-stage" data-testid="battle-stage">
           <div className="battle-gl" ref={stageRef}>
@@ -114,7 +141,9 @@ export function BattleScreen() {
           <div className="fx-layer" ref={fxRef} aria-hidden="true" />
           <div className="flash" ref={flashRef} aria-hidden="true" />
           <div className="ai-alert" ref={alertRef} hidden aria-hidden="true">！</div>
+          <div className="bubble battle-bubble" ref={bubbleRef} hidden data-testid="battle-bubble" />
 
+          {!inStory && (
           <div className="hud">
             <div className="hud-left">
               <div className="chip-stat">時間<b data-testid="hud-time">{fmt(hud.timeLeft)}</b></div>
@@ -131,6 +160,66 @@ export function BattleScreen() {
               </button>
             </div>
           </div>
+          )}
+          {!inStory && hud.phase === 'taunt' && session.b.some((l) => l.inBattle && l.text.trim()) && (
+            <button type="button" className="btn small taunt-skip" onClick={() => ctrl.current?.skipTaunt()} data-testid="skip-taunt">
+              跳過挑釁
+            </button>
+          )}
+          {confirmEnd && !inStory && (
+            <div className="overlay" data-testid="confirm-end">
+              <h2>{t('打夠了，要聽{他}說嗎？')}</h2>
+              <div className="btn-row center">
+                <button
+                  type="button"
+                  className="btn primary big"
+                  onClick={() => {
+                    setConfirmEnd(false);
+                    if (screenStore.get() === 'paused') dispatch('RESUME');
+                    ctrl.current?.endEarly();
+                  }}
+                  data-testid="confirm-end-yes"
+                >
+                  {t('聽{他}說')}
+                </button>
+                <button
+                  type="button"
+                  className="btn big"
+                  onClick={() => {
+                    setConfirmEnd(false);
+                    if (screenStore.get() === 'paused') dispatch('RESUME');
+                  }}
+                >
+                  繼續打
+                </button>
+              </div>
+            </div>
+          )}
+          {screen === 'apology' && story === 'apology' && (
+            <ApologyOverlay
+              startDelay={apologyDelay}
+              onDone={() => {
+                ctrl.current?.showWorthy();
+                setStory('worthy');
+              }}
+            />
+          )}
+          {screen === 'apology' && story === 'worthy' && <WorthyOverlay onDone={() => dispatch('APOLOGY_DONE')} />}
+          {screen === 'ending' && (
+            <EndingFlow
+              stars={resultStore.get()?.hits ?? 0}
+              onShow={(k) => ctrl.current?.playEnding(k)}
+              onRematch={() => {
+                updateBattle({ autoStart: true });
+                dispatch('REMATCH');
+              }}
+              onNewJerk={(reuse) => {
+                if (!reuse) getPaintStore().resetAll();
+                resetForNewJerk();
+                dispatch('NEW_JERK');
+              }}
+            />
+          )}
 
           {hud.phase === 'countdown' && !paused && <div className="countdown" aria-live="polite">{hud.countdown}</div>}
           {banner && (
@@ -139,7 +228,7 @@ export function BattleScreen() {
             </div>
           )}
 
-          {paused && (
+          {paused && !confirmEnd && (
             <div className="overlay" data-testid="pause-overlay">
               <h2>暫停中</h2>
               <div className="btn-row center">
@@ -162,6 +251,7 @@ export function BattleScreen() {
           )}
         </div>
 
+        {!inStory && (
         <div className="controls" aria-label="操作">
           <div className="pad-left">
             <button type="button" className="ctl" aria-label="往左" {...hold('left')} data-testid="ctl-left">◀</button>
@@ -215,10 +305,39 @@ export function BattleScreen() {
             </div>
           </div>
         </div>
+        )}
+        {!inStory && (
+          <div className="battle-extra">
+            <button
+              type="button"
+              className="btn small"
+              role="switch"
+              aria-checked={hud.chatter}
+              onClick={() => ctrl.current?.setChatter(!hud.chatter)}
+              data-testid="chatter"
+            >
+              賤話：{hud.chatter ? '開' : '關'}
+            </button>
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => {
+                if (screenStore.get() === 'battle') dispatch('PAUSE');
+                setConfirmEnd(true);
+              }}
+              disabled={hud.phase === 'ended'}
+              data-testid="end-early"
+            >
+              {t('打夠了，聽{他}說')}
+            </button>
+          </div>
+        )}
       </div>
-      <p className="keys">
-        電腦：<kbd>A</kbd><kbd>D</kbd> 或方向鍵移動、<kbd>1</kbd>～<kbd>{moves.length}</kbd> 出招、<kbd>Q</kbd> 切換徒手／武器、<kbd>空白</kbd> 閃避、<kbd>Esc</kbd> 暫停
-      </p>
+      {!inStory && (
+        <p className="keys">
+          電腦：<kbd>A</kbd><kbd>D</kbd> 或方向鍵移動、<kbd>1</kbd>～<kbd>{moves.length}</kbd> 出招、<kbd>Q</kbd> 切換徒手／武器、<kbd>空白</kbd> 閃避、<kbd>Esc</kbd> 暫停
+        </p>
+      )}
     </main>
   );
 }

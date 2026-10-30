@@ -77,6 +77,27 @@ function ball(r: number, color: string, x: number, y: number, z: number, scale: 
   return m;
 }
 
+/** 晴天娃娃的布（頭部設計座標）：上緣接球頭、下緣剛好蓋過軀幹頂與肩膀 */
+const TERU_CLOTH = { topY: -0.53, bottomY: -0.84, topR: 0.66, bottomR: 1.1, waves: 9, waveY: 0.035, waveR: 0.04 } as const;
+function teruClothGeometry() {
+  const C = TERU_CLOTH;
+  const g = new CylinderGeometry(C.topR, C.bottomR, C.topY - C.bottomY, 72, 1, true);
+  g.translate(0, (C.topY + C.bottomY) / 2, 0);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    if (Math.abs(pos.getY(i) - C.bottomY) > 1e-4) continue;
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const th = Math.atan2(x, z);
+    const w = Math.sin(th * C.waves);
+    const k = 1 + C.waveR * w;
+    pos.setXYZ(i, x * k, C.bottomY + C.waveY * w, z * k);
+  }
+  pos.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
+}
+
 let teruMat: MeshStandardMaterial | null = null;
 /** 晴天娃娃的臉：畫在球面貼圖正面（u＝0.25 是 +Z） */
 function teruFaceMaterial() {
@@ -180,12 +201,12 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
     head.position.y = 0.04;
     head.scale.set(1, keep, 1);
     head.castShadow = true;
-    const skirt = new Mesh(geo('teruSkirt2', () => new CylinderGeometry(0.4, 1.15, 0.85, 24, 1, true)), cloth('#FFFFFF'));
-    skirt.position.y = -1.12;
+    // 短短的圓錐布、波浪邊：從球頭下方往外斜，剛好蓋住肩膀上緣，布面都在軀幹外側
+    const skirt = new Mesh(geo('teruCloth', () => teruClothGeometry()), cloth('#FFFFFF'));
     skirt.castShadow = true;
-    const ribbon = new Mesh(geo('teruRibbon2', () => new TorusGeometry(0.42, 0.05, 8, 24)), plastic('#E53935'));
+    const ribbon = new Mesh(geo('teruRibbon3', () => new TorusGeometry(0.66, 0.045, 8, 40)), plastic('#E53935'));
     ribbon.rotation.x = Math.PI / 2;
-    ribbon.position.y = -0.7;
+    ribbon.position.y = TERU_CLOTH.topY + 0.01;
     return [{ part: 'head', object: group(head, skirt, ribbon) }];
   },
   chickenHead: () => {

@@ -18,6 +18,12 @@ export interface Session {
   /** null＝還沒選；skipped＝勾選略過 */
   angerBefore: number | null;
   angerSkipped: boolean;
+  /** 結尾後的「現在有多氣」 */
+  angerAfter: number | null;
+  /** 對同一對手連續選「再打爆一次」的次數 */
+  rematchStreak: number;
+  /** 休息提示每個對手只出現一次 */
+  restPromptShown: boolean;
 }
 
 let nextId = 1;
@@ -34,7 +40,15 @@ export function emptySession(): Session {
     d: Array.from({ length: FORM.dDefaultRows }, () => ({ id: newId(), text: '' })),
     angerBefore: null,
     angerSkipped: false,
+    angerAfter: null,
+    rematchStreak: 0,
+    restPromptShown: false,
   };
+}
+
+/** 「我還有其他爛人要打」：清空 A～D 與這個對手的紀錄，保留稱謂。 */
+export function resetForNewJerk() {
+  sessionStore.set((s) => ({ ...emptySession(), self: s.self, other: s.other }));
 }
 
 export const sessionStore = createStore<Session>(emptySession());

@@ -304,6 +304,75 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
 .mv-name, .mv small { position: relative; }
 .keys { font-size: 12px; color: var(--muted); margin: 0; }
 
+
+/* ---------- 戰鬥對話、提前結束 ---------- */
+.battle-bubble { z-index: 3; }
+.bubble.shake { animation: bubble-shake 0.2s; }
+@keyframes bubble-shake { 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
+.shatter { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.shard { position: absolute; font-weight: 900; font-size: clamp(13px, 2.6vw, 18px); color: var(--ink); line-height: 1.35; }
+.shard.star { color: var(--sun); -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; }
+.taunt-skip { position: absolute; right: 10px; bottom: 10px; z-index: 4; }
+.battle-extra { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.btn[role='switch'][aria-checked='true'] { background: var(--ink); color: #fff; }
+
+/* ---------- 道歉、結尾（擂台放大成全畫面） ---------- */
+.battle-screen.story-mode .battle-wrap { display: block; height: auto; }
+.battle-screen.story-mode .battle-stage { aspect-ratio: auto; height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+.story-overlay { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding: 16px; pointer-events: auto; }
+.story-overlay.apology { background: linear-gradient(to top, rgba(40, 24, 12, 0.72), rgba(40, 24, 12, 0.18) 55%, rgba(40, 24, 12, 0)); }
+.story-text { color: #fff8ec; display: flex; flex-direction: column; gap: 12px; max-height: 70%; overflow-y: auto; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); }
+.story-para { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: clamp(16px, 3.6vw, 20px); font-weight: 700; line-height: 1.6; animation: para-in 1.2s ease-out both; overflow-wrap: anywhere; white-space: pre-wrap; max-width: 38em; }
+@keyframes para-in { from { opacity: 0; translate: 0 8px; } }
+.story-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.story-corner { position: absolute; top: 10px; left: 12px; margin: 0; font-size: 11px; color: rgba(255, 248, 236, 0.85); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.story-overlay.worthy { justify-content: center; align-items: center; text-align: center; background: radial-gradient(circle at 50% 55%, rgba(255, 196, 120, 0.35), rgba(60, 30, 10, 0.55)); cursor: default; }
+.worthy-text { margin: 0; color: #fff8ec; font-size: clamp(22px, 5.4vw, 34px); font-weight: 900; line-height: 1.6; animation: para-in 1.6s ease-out both; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); }
+.worthy-hint { color: rgba(255, 248, 236, 0.8); font-size: 13px; animation: para-in 0.8s ease-out both; }
+
+.flow-layer { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-end; justify-content: center; padding: 16px; pointer-events: none; }
+.flow-layer > * { pointer-events: auto; }
+.flow-card { width: min(560px, 100%); background: rgba(255, 255, 255, 0.95); border: 2px solid var(--ink); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; animation: para-in 0.6s ease-out both; max-height: 100%; overflow-y: auto; }
+.flow-card h2 { margin: 0; font-size: 18px; display: flex; gap: 8px; align-items: baseline; }
+.flow-text { margin: 0; font-size: 17px; font-weight: 800; text-align: center; }
+.flow-main { margin: 0; font-size: clamp(18px, 4.4vw, 24px); font-weight: 900; text-align: center; }
+.flow-sub { margin: 0; font-size: 15px; text-align: center; color: var(--muted); }
+.flow-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* 五個結尾選項：大小、顏色、字級完全相同 */
+.choice-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.btn.choice, .btn.equal { min-height: 48px; font-size: 16px; font-weight: 800; background: var(--card); color: var(--ink); border-color: var(--ink); width: 100%; }
+.ending-text .btn { align-self: center; }
+.anger-compare { margin: 0; font-size: 16px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.support-hint { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+/* 結局的天空 */
+.sky { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.sky-forgive::before, .sky-forgive::after { content: ''; position: absolute; top: -10%; width: 62%; height: 46%; background: radial-gradient(circle at 30% 60%, #fff 0 22%, transparent 23%), radial-gradient(circle at 55% 45%, #fff 0 26%, transparent 27%), radial-gradient(circle at 78% 62%, #fff 0 20%, transparent 21%); filter: blur(5px) drop-shadow(0 6px 10px rgba(180, 150, 90, 0.35)); opacity: 0.92; }
+.sky-forgive::before { left: -6%; animation: cloud-left 3s 0.3s ease-in-out both; }
+.sky-forgive::after { right: -6%; animation: cloud-right 3s 0.3s ease-in-out both; }
+.sky-forgive { background: radial-gradient(ellipse at 50% -10%, rgba(255, 220, 120, 0.55), transparent 60%); animation: sky-fade 3s ease-out both; }
+@keyframes cloud-left { from { translate: 30% 0; } to { translate: -55% 0; } }
+@keyframes cloud-right { from { translate: -30% 0; } to { translate: 55% 0; } }
+.sky-leave { background: linear-gradient(90deg, rgba(255, 244, 214, 0.95), rgba(255, 228, 170, 0.35) 18%, transparent 40%); opacity: 0; animation: sky-fade 2.5s 4s ease-out both; }
+.sky-later { background: linear-gradient(to bottom, rgba(255, 150, 120, 0.55), rgba(255, 196, 140, 0.25) 45%, transparent 70%); animation: sky-fade 4s ease-out both; }
+@keyframes sky-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* 降溫段 */
+.calm { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(circle at 50% 50%, rgba(60, 50, 90, 0.75), rgba(25, 22, 45, 0.92)); color: #fff8ec; overflow: hidden; pointer-events: auto; }
+.calm-title { margin: 0; font-size: clamp(18px, 4.4vw, 24px); font-weight: 800; text-align: center; padding: 0 56px; }
+.calm-skip { position: absolute; top: 10px; right: 10px; }
+.calm-ring { width: min(46vw, 220px); aspect-ratio: 1; border-radius: 50%; border: 3px solid rgba(255, 220, 150, 0.9); box-shadow: 0 0 40px rgba(255, 210, 130, 0.6), inset 0 0 30px rgba(255, 210, 130, 0.35); transform: scale(0.6); transition-property: transform, opacity; transition-timing-function: ease-in-out; }
+.calm-ring[data-inhale='true'] { transform: scale(1); }
+.calm-ring.reduced { transform: none; opacity: 0.45; transition-property: opacity; }
+.calm-ring.reduced[data-inhale='true'] { opacity: 1; }
+.calm-word { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.3em; }
+.calm-stars span { position: absolute; bottom: -24px; color: rgba(255, 214, 120, 0.85); animation: star-rise linear infinite; }
+@keyframes star-rise { from { transform: translateY(0); opacity: 0; } 10% { opacity: 0.9; } to { transform: translateY(-120vh); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .calm-stars span { animation-duration: 30s !important; }
+  .sky-forgive::before, .sky-forgive::after { animation: none; display: none; }
+}
+
 /* ---------- 擂台 ---------- */
 .arena-wrap { display: flex; flex-direction: column; gap: 10px; }
 .arena-stage { position: relative; border: 2px solid var(--ink); border-radius: 16px; overflow: hidden; background: #e8e7de; aspect-ratio: 16 / 10; touch-action: none; }

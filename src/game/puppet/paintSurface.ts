@@ -261,6 +261,14 @@ export class PaintStore {
     return new Set(PAINT_PARTS.map((p) => this.surfaces[p].texture));
   }
 
+  /** 換一個新對手且不沿用外觀：全部恢復空白，並清空復原紀錄。 */
+  resetAll() {
+    this.resetCanvases();
+    this.touched.clear();
+    this.history.clear();
+    this.emit();
+  }
+
   /** 是否已被畫過（不是全空白）。 */
   get hasPaint(): boolean {
     return this.touched.size > 0;

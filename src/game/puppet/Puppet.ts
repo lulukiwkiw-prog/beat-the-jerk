@@ -41,6 +41,11 @@ export class Puppet {
   private stance = false;
   private stanceFront: 'L' | 'R' = 'L';
   private extraPaint: Mesh[] = [];
+  /** 演出姿勢：站、單膝跪地（道歉）、坐（結局） */
+  private poseMode: 'stand' | 'kneel' | 'sit' = 'stand';
+  private drop = spring0();
+  private fadeLevel = 1;
+  private fadeMats: MeshStandardMaterial[] | null = null;
   readonly meshes = {} as Record<PaintPartId, Mesh>;
   readonly fixed = {} as Record<FixedPartId, Mesh>;
   private readonly joints: Record<string, Group> = {};
@@ -250,6 +255,9 @@ export class Puppet {
     this.waveT = this.downT = 0;
     this.act = null;
     this.aiPose = 'idle';
+    this.poseMode = 'stand';
+    this.drop = spring0();
+    this.setFade(1);
     this.decals.clear();
     this.delayed.reset();
     this.apply();
@@ -312,6 +320,37 @@ export class Puppet {
   setAiPose(pose: AiPose, side: -1 | 1) {
     this.aiPose = pose;
     this.aiSide = side;
+  }
+
+  setPoseMode(m: 'stand' | 'kneel' | 'sit') {
+    this.poseMode = m;
+  }
+
+  /** 淡出／淡入（1＝完全不透明）。第一次呼叫時複製材質，不影響其他共用材質的物件。 */
+  setFade(alpha: number) {
+    if (alpha === this.fadeLevel) return;
+    this.fadeLevel = alpha;
+    if (!this.fadeMats) {
+      const list: MeshStandardMaterial[] = [];
+      this.root.traverse((o) => {
+        const m = o as Mesh;
+        if (!m.isMesh) return;
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        const cloned = mats.map((x) => {
+          const c = (x as MeshStandardMaterial).clone();
+          list.push(c);
+          return c;
+        });
+        m.material = Array.isArray(m.material) ? cloned : cloned[0];
+      });
+      this.fadeMats = list;
+    }
+    for (const m of this.fadeMats) {
+      m.transparent = alpha < 1;
+      m.opacity = alpha;
+      m.depthWrite = alpha > 0.5;
+    }
+    this.root.visible = alpha > 0.01;
   }
 
   gloat() {
@@ -394,6 +433,8 @@ export class Puppet {
     }
 
     stepSpring(this.yaw, this.yawTarget, S.spin.k * 0.5, S.spin.d, dt);
+    // 跪下、坐下時身體往下沉，膝蓋或屁股碰到地板
+    stepSpring(this.drop, this.poseMode === 'kneel' ? PUPPET.kneelDrop : this.poseMode === 'sit' ? PUPPET.sitDrop : 0, 60, 14, dt);
     stepSpring(this.sx, 1, S.squash.k, S.squash.d, dt);
     stepSpring(this.sy, 1, S.squash.k, S.squash.d, dt);
     const L = PUPPET.squashLimits;
@@ -483,6 +524,33 @@ export class Puppet {
         T.torsoZ = 0.16 * k;
       }
     }
+    if (this.poseMode === 'kneel') {
+      // 單膝跪地、低頭
+      T.hipLx = -1.45;
+      T.knL = 1.5;
+      T.hipRx = 0.1;
+      T.knR = 1.55;
+      T.torsoX = 0.12;
+      T.headX = 0.5;
+      T.headY = 0;
+      T.headZ = 0;
+      T.shL = -0.05;
+      T.shR = 0.05;
+      T.elL = -0.2;
+      T.elR = 0.2;
+    } else if (this.poseMode === 'sit') {
+      // 坐在地上、腿往前伸、手放膝上
+      T.hipLx = -1.5;
+      T.hipRx = -1.5;
+      T.knL = 0.25;
+      T.knR = 0.25;
+      T.torsoX = -0.05;
+      T.headX = 0.15;
+      T.shL = -0.25;
+      T.shR = 0.25;
+      T.elL = -0.3;
+      T.elR = 0.3;
+    }
     if (this.act === 'gloat') {
       const a = this.actT;
       T.torsoZ = Math.sin(a * 9) * 0.14;
@@ -502,7 +570,7 @@ export class Puppet {
   private apply() {
     const p = this.pose;
     const j = this.joints;
-    this.root.position.set(this.x, this.lift, 0);
+    this.root.position.set(this.x, this.lift - this.drop.v, 0);
     this.spinPivot.rotation.z = this.spin.v;
     this.squashG.scale.set(this.sx.v, this.sy.v, this.sx.v);
     j.torso.rotation.set(p.torsoX.v, 0, p.torsoZ.v);

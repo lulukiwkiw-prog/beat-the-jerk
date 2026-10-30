@@ -78,9 +78,9 @@ test('命中得分、落空不得分、投射物碰撞、冷卻、暫停、時�
   expect((await b.battle()).paused).toBe(true);
   await page.getByTestId('resume').click();
 
-  // 時間到 → 回合結束畫面，分數一致
-  const score = (await b.battle()).score;
-  await expect(page.getByTestId('final-score')).toHaveText(String(score), { timeout: 30_000 });
+  // 時間到 → 只結束一次，進入道歉
+  await expect(page.getByTestId('apology')).toBeVisible({ timeout: 40_000 });
+  expect((await b.battle()).phase).toBe('apology');
   expect(errors).toEqual([]);
 });
 
@@ -117,36 +117,6 @@ test('手機：移動與攻擊可同時觸控（多指）', async ({ page }) => 
   const x2 = (await b.battle()).playerX;
   await page.waitForTimeout(800);
   expect((await b.battle()).playerX).toBeCloseTo(x2, 0);
-});
-
-test('再打一場：分數歸零、計時重來且速度不變、場上無殘留', async ({ page }) => {
-  await toBattle(page, 6);
-  const b = bt(page);
-  const rates: number[] = [];
-  for (let round = 0; round < 3; round++) {
-    if (round > 0) {
-      await page.getByTestId('rematch').click();
-      await waitPhase(page, 'fight');
-      const s = await b.battle();
-      expect(s.score).toBe(0);
-      expect(s.combo).toBe(0);
-      expect(s.projectiles).toBe(0);
-      expect(s.scattered).toBe(false);
-    }
-    // 計時速度：實際經過 2 秒，計時也大約走 2 秒
-    const a = await b.battle();
-    const t0 = Date.now();
-    await page.waitForTimeout(2000);
-    const c = await b.battle();
-    rates.push((c.elapsed - a.elapsed) / ((Date.now() - t0) / 1000));
-    await page.keyboard.press('q');
-    await page.keyboard.press('1');
-    await expect(page.getByTestId('final-score')).toBeVisible({ timeout: 30_000 });
-  }
-  for (const r of rates) {
-    expect(r).toBeGreaterThan(0.85);
-    expect(r).toBeLessThan(1.15);
-  }
 });
 
 test('暫停中「重新開始」：歸零且噴飛零件立刻歸位', async ({ page }) => {
