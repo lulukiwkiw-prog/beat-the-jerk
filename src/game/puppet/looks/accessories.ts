@@ -308,18 +308,23 @@ const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
   },
   // 爆炸頭：一大團圓蓬蓬的捲髮，表面一顆顆凸起
   afro: () => {
+    // 爆炸頭：一大團圓蓬蓬的捲髮，往上、往後長，臉露出來
     const C = '#3B2A22';
-    const big = ball(0.92, C, 0, 0.42, -0.12, [1, 0.92, 0.95]);
+    const cy = 0.62;
+    const cz = -0.4;
+    const big = ball(0.92, C, 0, cy, cz, [1.05, 0.92, 0.95]);
     const bumps: Mesh[] = [];
-    for (let i = 0; i < 46; i++) {
-      // 黃金角均勻散在球面上，前下方（臉）不放
-      const yy = 1 - (i + 0.5) / 46 * 1.6;
+    for (let i = 0; i < 52; i++) {
+      // 黃金角均勻散在球面上；臉前方（前側、眉毛以下）不放
+      const yy = 1 - ((i + 0.5) / 52) * 1.7;
       const rr = Math.sqrt(Math.max(0, 1 - yy * yy));
       const th = i * 2.39996;
       const x = Math.sin(th) * rr;
       const z = Math.cos(th) * rr;
-      if (z > 0.45 && yy < 0.25) continue;
-      bumps.push(ball(0.2, C, x * 0.9, 0.42 + yy * 0.83, -0.12 + z * 0.88));
+      const py = cy + yy * 0.84;
+      const pz = cz + z * 0.87;
+      if (pz > 0.25 && py < 0.95) continue;
+      bumps.push(ball(0.2, C, x * 0.96, py, pz));
     }
     return [{ part: 'head', object: group(big, ...bumps) }];
   },

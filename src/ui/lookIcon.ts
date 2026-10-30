@@ -138,10 +138,10 @@ function overlayDesign(c: CanvasRenderingContext2D, id: AccessoryId) {
       }
       break;
     case 'afro':
-      e('#3B2A22', 0, top + 0.05, 0.95, 0.8);
+      e('#3B2A22', 0, top + 0.2, 0.95, 0.75);
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * Math.PI * 2;
-        e('#3B2A22', Math.cos(a) * 0.92, top + 0.05 + Math.sin(a) * 0.78, 0.2, 0.2);
+        e('#3B2A22', Math.cos(a) * 0.92, top + 0.2 + Math.sin(a) * 0.72, 0.2, 0.2);
       }
       break;
     case 'chickenSuit':
