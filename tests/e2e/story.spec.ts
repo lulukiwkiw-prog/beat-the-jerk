@@ -3,8 +3,6 @@ import { bt, quickBattle, throughApology, waitPhase, watchConsole } from './help
 
 const fillAll = async (p: Page) => {
   await p.getByTestId('field-b-0').fill('這點小事都做不好？');
-  await p.getByTestId('field-b-1').fill('<b>沒勾的</b>');
-  await p.getByRole('checkbox', { name: '戰鬥中出現' }).nth(1).uncheck();
   await p.getByRole('button', { name: '委屈', exact: true }).click();
   await p.getByRole('button', { name: '生氣', exact: true }).click();
   await p.getByTestId('field-d-0').fill('不是你的錯');
@@ -37,7 +35,7 @@ test('完整流程：開場挑釁 → 戰鬥 D 對話 → 道歉稿 → 值得�
   const skip = page.getByRole('button', { name: '略過' });
   if (await skip.isVisible()) await skip.click();
   await page.getByTestId('begin-battle').click();
-  // 開場挑釁：只說勾選的 B
+  // 開場挑釁：說出填寫的 B
   await expect(page.getByTestId('battle-bubble')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('battle-bubble')).toHaveText('這點小事都做不好？');
   await waitPhase(page, 'fight');
@@ -58,7 +56,6 @@ test('完整流程：開場挑釁 → 戰鬥 D 對話 → 道歉稿 → 值得�
   const text = await page.getByTestId('apology').innerText();
   expect(text).toContain('「明明是他沒做事，卻當眾怪我。」');
   expect(text).toContain('「這點小事都做不好？」');
-  expect(text).not.toContain('沒勾的');
   expect(text).toContain('原來這些話，讓你感到委屈和生氣。');
   expect(text).toContain('不是你的錯');
   expect(text).toContain('原不原諒，由你決定。');

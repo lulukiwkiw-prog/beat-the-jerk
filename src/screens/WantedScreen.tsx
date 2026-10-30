@@ -86,24 +86,6 @@ export function WantedScreen() {
                 max={FORM.bMax}
                 testId={`field-b-${i}`}
               />
-              <div className="line-tools">
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={line.inBattle}
-                    onChange={(e) => updateSession((p) => ({ b: p.b.map((l) => (l.id === line.id ? { ...l, inBattle: e.target.checked } : l)) }))}
-                  />
-                  戰鬥中出現
-                </label>
-                <button
-                  type="button"
-                  className="btn small ghost"
-                  aria-label={`刪除 B 第 ${i + 1} 句`}
-                  onClick={() => updateSession((p) => ({ b: p.b.filter((l) => l.id !== line.id) }))}
-                >
-                  刪除
-                </button>
-              </div>
             </div>
           ))}
           {s.b.length < FORM.bMaxRows && (

@@ -72,14 +72,14 @@ test('稱謂切換會替換介面文字', async ({ page }) => {
   await expect(page.getByTestId('field-a')).toHaveAttribute('placeholder', '明明是她沒做事，卻當眾怪我。');
 });
 
-test('B 可新增至 8 欄、可刪除；自訂心情最多 5 個', async ({ page }) => {
+test('B 可新增至 8 欄（不再有戰鬥中出現勾選與刪除鈕）；自訂心情最多 5 個', async ({ page }) => {
   await page.goto('/');
   const add = page.getByRole('button', { name: /再加一句（\d／8）/ });
   for (let i = 0; i < 5; i++) await add.click();
   await expect(page.getByTestId('field-b-7')).toBeVisible();
   await expect(add).toBeHidden();
-  await page.getByRole('button', { name: '刪除 B 第 8 句' }).click();
-  await expect(page.getByTestId('field-b-7')).toBeHidden();
+  await expect(page.getByRole('checkbox', { name: '戰鬥中出現' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /刪除 B/ })).toHaveCount(0);
   const custom = page.getByRole('textbox', { name: '自訂心情' });
   for (const f of ['煩', '累', '傻眼', '火大', '無言']) {
     await custom.fill(f);
