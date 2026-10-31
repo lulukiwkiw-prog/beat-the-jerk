@@ -1,6 +1,7 @@
 import { CylinderGeometry, Group, Mesh, MeshStandardMaterial, Object3D, Vector3, type Material } from 'three';
 import { GAME } from '../../config/game.config';
 import { PUPPET } from '../../config/puppet.config';
+import { EFFECTS, JUGGLE } from '../../config/effects.config';
 import { plastic, plasticUnique, srgb } from '../three/color';
 import { atlasBox, cachedRoundedBox, roundedCylinderAtlas, studGeometry } from '../three/geometry';
 import { DecalLayer } from './decals';
@@ -59,7 +60,11 @@ export class Puppet {
   private bucket: Object3D | null = null;
   /** 困難模式閃避：剩餘無敵時間 */
   private evadeT = 0;
-  private fadeMats: MeshStandardMaterial[] | null = null;
+  /** 空中連擊：滯空剩餘時間 */
+  private hangT = 0;
+  /** 命中閃白光剩餘時間 */
+  private flashT = 0;
+  private ownMats: MeshStandardMaterial[] | null = null;
   readonly meshes = {} as Record<PaintPartId, Mesh>;
   readonly fixed = {} as Record<FixedPartId, Mesh>;
   private readonly joints: Record<string, Group> = {};
@@ -447,7 +452,7 @@ export class Puppet {
 
   /** 清除暫時狀態（暈眩、套頭水桶、手風琴、轉圈）：重新開始、道歉轉場時呼叫。 */
   clearStatus() {
-    this.spinT = this.stunT = this.accT = this.evadeT = 0;
+    this.spinT = this.stunT = this.accT = this.evadeT = this.hangT = 0;
     this.explodeAfterAcc = false;
     this.bucket?.removeFromParent();
     this.bucket = null;
@@ -470,16 +475,16 @@ export class Puppet {
     this.poseMode = m;
   }
 
-  /** 淡出／淡入（1＝完全不透明）。第一次呼叫時複製材質，不影響其他共用材質的物件。 */
-  setFade(alpha: number) {
-    if (alpha === this.fadeLevel) return;
-    this.fadeLevel = alpha;
-    if (!this.fadeMats) {
+  /** 第一次需要時複製材質（淡出、閃白光），不影響其他共用材質的物件。 */
+  private materials(): MeshStandardMaterial[] {
+    if (!this.ownMats) {
       const list: MeshStandardMaterial[] = [];
       this.root.traverse((o) => {
         const m = o as Mesh;
         if (!m.isMesh) return;
         const mats = Array.isArray(m.material) ? m.material : [m.material];
+        // 只處理一般塑膠材質（掌印、鞋印貼片是另一種材質，不動）
+        if (!mats.every((x) => (x as MeshStandardMaterial).isMeshStandardMaterial)) return;
         const cloned = mats.map((x) => {
           const c = (x as MeshStandardMaterial).clone();
           list.push(c);
@@ -487,9 +492,31 @@ export class Puppet {
         });
         m.material = Array.isArray(m.material) ? cloned : cloned[0];
       });
-      this.fadeMats = list;
+      this.ownMats = list;
     }
-    for (const m of this.fadeMats) {
+    return this.ownMats;
+  }
+
+  /** 命中瞬間閃白光 */
+  hitFlash(time: number) {
+    this.flashT = time;
+    this.flashMax = time;
+  }
+  private flashMax = 1;
+
+  /** 空中連擊：命中時往上托一下並短暫滯空，水平擊退變小（才接得到下一擊） */
+  juggle(vy: number, hang: number, pushKeep: number) {
+    if (!this.airborne) return;
+    this.vy = Math.max(this.vy * 0.2, vy);
+    this.vx *= pushKeep;
+    this.hangT = hang;
+  }
+
+  /** 淡出／淡入（1＝完全不透明）。 */
+  setFade(alpha: number) {
+    if (alpha === this.fadeLevel) return;
+    this.fadeLevel = alpha;
+    for (const m of this.materials()) {
       m.transparent = alpha < 1;
       m.opacity = alpha;
       m.depthWrite = alpha > 0.5;
@@ -534,6 +561,16 @@ export class Puppet {
     this.downT = Math.max(0, this.downT - dt);
     this.spinT = Math.max(0, this.spinT - dt);
     this.evadeT = Math.max(0, this.evadeT - dt);
+    this.hangT = Math.max(0, this.hangT - dt);
+    if (this.flashT > 0 || this.ownMats) {
+      this.flashT = Math.max(0, this.flashT - dt);
+      const k = this.flashT > 0 ? (this.flashT / this.flashMax) * EFFECTS.hitFlash.intensity : 0;
+      for (const m of this.materials()) {
+        if (m.emissiveIntensity === k && k === 0) continue;
+        m.emissive.setRGB(1, 1, 1);
+        m.emissiveIntensity = k;
+      }
+    }
     if (this.stunT > 0) {
       this.stunT = Math.max(0, this.stunT - dt);
       if (this.stunT === 0) {
@@ -545,7 +582,8 @@ export class Puppet {
 
     const S = PUPPET.springs;
     if (this.airborne || this.lift > 0) {
-      this.vy -= GAME.gravity * dt;
+      // 空中連擊滯空時重力變小
+      this.vy -= GAME.gravity * (this.hangT > 0 ? JUGGLE.hangGravity : 1) * dt;
       this.lift += this.vy * dt;
       this.spin.v += this.spin.vel * dt;
       if (this.lift <= 0) {

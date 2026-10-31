@@ -1,6 +1,7 @@
 import { GAME } from '../../config/game.config';
 import { H, MOVES, PLAYER, type MoveId } from '../../config/moves.config';
 import { PUPPET } from '../../config/puppet.config';
+import { JUGGLE } from '../../config/effects.config';
 import { dashProgress, startAttack, type ActiveAttack } from '../moves/attack';
 import type { PlayerRig } from './playerModel';
 import { buildBucket, buildChair, buildClub, buildHammer, buildShoe } from '../projectiles/weaponModels';
@@ -29,6 +30,9 @@ export class Player {
   /** 困難模式：被擊倒（躺下再起身）與起身後的無敵時間 */
   down = false;
   invuln = 0;
+  /** 空中連擊：跳起追打的高度（目前、目標） */
+  airLift = 0;
+  airTarget = 0;
   /** 致命一擊演出：集氣（0～1）、推出光波（0～1） */
   powerUp = 0;
   thrust = 0;
@@ -70,6 +74,7 @@ export class Player {
     this.dodge = this.dodgeCd = this.stun = this.hop = this.invuln = 0;
     this.dodgeAge = Infinity;
     this.down = false;
+    this.airLift = this.airTarget = 0;
   }
 
   get busy() {
@@ -144,6 +149,10 @@ export class Player {
     this.invuln = Math.max(0, this.invuln - dt);
     this.dodgeAge += dt;
     this.bob += dt;
+    // 空中連擊：快速跳上去、慢慢落下
+    const J = JUGGLE;
+    const target = this.attack ? this.airTarget : 0;
+    this.airLift = target > this.airLift ? Math.min(target, this.airLift + J.riseRate * dt) : Math.max(target, this.airLift - J.fallRate * dt);
     if (this.dodge > 0) {
       this.dodge = Math.max(0, this.dodge - dt);
       this.hop = Math.sin((1 - this.dodge / PLAYER.dodgeTime) * Math.PI) * PLAYER.dodgeHop;
@@ -170,6 +179,19 @@ export class Player {
     }
   }
 
+  /** 殘影要複製的部位：拳類＝拳套、腿類＝雙腿、棍棒／鐵錘＝武器＋拳套 */
+  trailParts(): Object3D[] {
+    const a = this.attack;
+    if (!a) return [];
+    const L = this.rig;
+    const id = a.move.id;
+    if (id === 'spin' || id === 'flykick' || id === 'stomp') return [L.legL, L.legR];
+    if (id === 'club') return [this.held.club, L.gloveR];
+    if (id === 'hammer') return a.t >= a.move.windup ? [this.held.hammer, L.gloveL, L.gloveR] : [];
+    if (id === 'chair') return [];
+    return [L.gloveL, L.gloveR];
+  }
+
   /**
    * 依目前狀態擺姿勢（每個渲染畫格呼叫）。target＝對手的位置與臉的高度，
    * 甩巴掌時用來讓手真的甩到臉上。
@@ -177,7 +199,7 @@ export class Player {
   pose(frameDt: number, target: { x: number; faceY: number; faceFront: number }) {
     const L = this.rig;
     const a = this.attack;
-    L.root.position.set(this.x, this.hop, 0);
+    L.root.position.set(this.x, this.hop + this.airLift, 0);
     let face = this.facing > 0 ? 0.85 : -0.85;
     let yawRate = 14;
     let slap: { arm: 'L' | 'R'; shX: number } | null = null;

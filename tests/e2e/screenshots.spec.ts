@@ -12,7 +12,7 @@ for (const s of SIZES) {
   test(`截圖 ${s.name}`, async ({ page }) => {
     test.setTimeout(240_000);
     await page.setViewportSize({ width: s.width, height: s.height });
-    await page.goto('/?round=8');
+    await page.goto('/?round=15');
     await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
     await page.getByRole('button', { name: '委屈', exact: true }).click();
     await page.getByTestId('field-d-0').fill('不是你的錯');
@@ -39,15 +39,26 @@ for (const s of SIZES) {
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${DIR}/${s.name}-03-countdown.png` });
     await waitPhase(page, 'fight');
-    const st = await b.battle();
-    await b.setPlayerX(st.puppetX - 2.2);
-    await page.keyboard.press('1');
+    // 困難模式木偶偶爾會閃開：打到為止
+    for (let i = 0; i < 6 && !(await b.battle()).bubble; i++) {
+      await b.setPlayerX((await b.battle()).puppetX - 2.2);
+      await page.keyboard.press('1');
+      await page.waitForTimeout(700);
+    }
     await expect(page.getByTestId('battle-bubble')).toBeVisible();
     await page.screenshot({ path: `${DIR}/${s.name}-04-fight.png` });
     // 武器頁：丟水桶套頭
     await page.keyboard.press('q');
-    await page.keyboard.press('2');
-    await expect.poll(async () => (await b.battle()).bucket, { timeout: 10_000 }).toBe(true);
+    // 困難模式木偶偶爾會閃開：丟到套上頭為止（水桶只套 1.5 秒，要邊等邊看）
+    let hit = false;
+    for (let i = 0; i < 4 && !hit; i++) {
+      await page.keyboard.press('2');
+      for (let k = 0; k < 52 && !hit; k++) {
+        hit = (await b.battle()).bucket;
+        if (!hit) await page.waitForTimeout(50);
+      }
+    }
+    expect(hit).toBe(true);
     await page.screenshot({ path: `${DIR}/${s.name}-04b-weapon.png` });
     await expect(page.getByTestId('apology')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText('關於你寫下的這件事：')).toBeVisible({ timeout: 30_000 });

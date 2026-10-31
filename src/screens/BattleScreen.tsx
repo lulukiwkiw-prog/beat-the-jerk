@@ -244,6 +244,12 @@ export function BattleScreen() {
           )}
 
           {hud.phase === 'countdown' && !paused && <div className="countdown" aria-live="polite">{hud.countdown}</div>}
+          {hud.combo >= 2 && hud.phase === 'fight' && !inStory && (
+            <div className="combo-pop" key={hud.combo} data-tier={hud.combo >= 20 ? 3 : hud.combo >= 10 ? 2 : 1} aria-hidden="true" data-testid="combo-pop">
+              <b>{hud.combo}</b>
+              <span>連擊！</span>
+            </div>
+          )}
           {banner && (
             <div className="banner" key={banner.id} role="status">
               {banner.text}

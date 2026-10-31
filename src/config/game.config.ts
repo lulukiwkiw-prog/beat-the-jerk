@@ -34,7 +34,7 @@ export const CAMERA = {
   lookY: 2.75,
   baseY: 3.7,
   /** 晃動強度（弱、強） */
-  shake: { weak: 0.12, strong: 0.26 },
+  shake: { weak: 0.2, strong: 0.38 },
   /** 晃動衰減（每秒） */
   shakeDecay: 0.8,
 } as const;

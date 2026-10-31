@@ -1,6 +1,7 @@
 import { Color, Fog, Vector3 } from 'three';
 import { CAMERA, GAME } from '../../config/game.config';
-import { EFFECTS } from '../../config/effects.config';
+import { EFFECTS, JUGGLE } from '../../config/effects.config';
+import { AfterImages } from '../effects/afterimage';
 import { H, MOVE_SETS, MOVES, PLAYER, type DashMove, type MeleeMove, type MoveId, type MoveKind, type ThrowMove } from '../../config/moves.config';
 import { PUPPET } from '../../config/puppet.config';
 import { EASY_AI, FINISHER, HARD_AI, KNOCKDOWN, ROUND } from '../../config/round.config';
@@ -37,6 +38,11 @@ import { SceneHost } from '../three/sceneHost';
 
 /** 各近戰招式命中點的高度（離木偶腳底） */
 const HIT_Y: Partial<Record<MoveId, number>> = { slap: 4.1, stomp: 1.4, hammer: 4.6, spin: 2.8, club: 3.8 };
+/** 浮空時打得到的高度：踩扁、鐵錘只能打地面上的 */
+const AIR_OK = (id: MoveId) => id !== 'stomp' && id !== 'hammer';
+const reachLift = (m: { id: MoveId; maxTargetLift: number }, airborne: boolean) =>
+  (airborne && AIR_OK(m.id) ? Math.max(m.maxTargetLift, JUGGLE.airReach) : m.maxTargetLift) * H;
+
 /** 大招：特效與鏡頭晃動較大 */
 const BIG_HITS = new Set<MoveId>(['uppercut', 'shoe', 'stomp', 'spin', 'flykick', 'bucket', 'chair', 'hammer']);
 
@@ -146,6 +152,10 @@ export class BattleController {
   private director: DialogueDirector;
   private bubble: DialogueBubble;
   private hits = 0;
+  /** 命中停格剩餘秒數、殘影 */
+  private hitStop = 0;
+  private ghosts: AfterImages;
+  private ghostT = 0;
   /** 困難模式成功閃避次數 */
   private dodges = 0;
   private early = false;
@@ -180,6 +190,7 @@ export class BattleController {
     this.particles = new Particles(this.host.scene);
     this.words = new ComicWords(dom.fx);
     this.shoes = new Projectiles(this.host.scene);
+    this.ghosts = new AfterImages(this.host.scene);
     this.input = new BattleInput(() => this.requestPause());
     this.clock = new RoundClock(roundLength);
     document.addEventListener('visibilitychange', this.onVis);
@@ -210,6 +221,8 @@ export class BattleController {
     this.puppet.reset(GAME.puppetStartX);
     this.resetAi();
     this.shoes.clear();
+    this.ghosts.clear();
+    this.hitStop = 0;
     this.particles.clear();
     this.words.clear();
     this.setWarmth(0);
@@ -286,6 +299,12 @@ export class BattleController {
 
   private update(dt: number) {
     if (this.paused || this.disposed) return;
+    // 命中停格：一瞬間全部定住，打擊更有份量（畫面晃動照常）
+    if (this.hitStop > 0 && this.phase === 'fight') {
+      this.hitStop -= dt;
+      this.shake = Math.max(0, this.shake - dt * CAMERA.shakeDecay);
+      return;
+    }
     this.gameTime += dt;
     this.phaseTime += dt;
     if (SHOW_PHASES.includes(this.phase)) {
@@ -330,7 +349,15 @@ export class BattleController {
     const p = this.puppet;
     const pl = this.player;
     const move = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
+    // 空中連擊：對手浮空時，近戰招式會跳起來追打
+    const chase = !!pl.attack && pl.attack.move.type !== 'throw' && AIR_OK(pl.attack.move.id) && p.airborne && p.lift > 1 && this.live;
+    pl.airTarget = chase ? Math.min(JUGGLE.playerMax, Math.max(0, p.lift - JUGGLE.playerBelow)) : 0;
     pl.update(dt, move as -1 | 0 | 1, p.x, this.live);
+    if (chase) {
+      const side = Math.sign(p.x - pl.x) || pl.facing;
+      const want = p.x - side * (PLAYER.halfWidth + PUPPET.halfWidth + 0.6);
+      pl.x += Math.max(-JUGGLE.chaseSpeed * dt, Math.min(JUGGLE.chaseSpeed * dt, want - pl.x));
+    }
     if (pl.attack) {
       const att = pl.attack;
       for (const e of stepAttack(att, dt)) {
@@ -340,6 +367,12 @@ export class BattleController {
         else if (e.kind === 'dashEnd') {
           if (!att.landed) this.words.add('揮空', pl.x + att.facing * 1.6, 3.6, '#C9D2F2', 0.55);
         } else this.shoes.throw(att.move as ThrowMove, pl.x, att.facing, hitIdOf(this.round, att.seq, 0), p.x);
+      }
+      // 殘影：出招有效的那段時間連續留下拳頭、腿、武器的影子
+      this.ghostT -= dt;
+      if (this.ghostT <= 0 && att.t >= att.move.windup * 0.4) {
+        this.ghostT = EFFECTS.afterimage.every;
+        this.ghosts.spawn(pl.trailParts());
       }
       if (attackFinished(att)) {
         pl.attack = null;
@@ -398,6 +431,7 @@ export class BattleController {
     this.blockPuppet();
     this.ledger.tick(this.clock.elapsed());
     this.particles.update(dt);
+    this.ghosts.update(dt);
     this.words.update(dt);
     this.shake = Math.max(0, this.shake - dt * CAMERA.shakeDecay);
     this.flash = Math.max(0, this.flash - dt * EFFECTS.flashDecay);
@@ -426,7 +460,7 @@ export class BattleController {
       range: m.range, backRange: m.backRange, H,
     });
     // 落空：不在範圍、太高打不到，或噴飛／組回中
-    if (!reach || p.lift > m.maxTargetLift * H || p.invulnerable) {
+    if (!reach || p.lift > reachLift(m, p.airborne) || p.invulnerable) {
       if (segment === 0) this.words.add('揮空', pl.x + att.facing * 1.6, 3.6, '#C9D2F2', 0.55);
       return;
     }
@@ -457,7 +491,7 @@ export class BattleController {
       playerX: pl.x, facing: att.facing, targetX: p.x, playerHalf: PLAYER.halfWidth, targetHalf: PUPPET.halfWidth,
       range: m.range, backRange: 0, H,
     });
-    if (!reach || p.lift > m.maxTargetLift * H || p.invulnerable) return;
+    if (!reach || p.lift > reachLift(m, p.airborne) || p.invulnerable) return;
     att.landed = true;
     this.applyHit(m.id, hitIdOf(this.round, att.seq, 0), 0, new Vector3(p.x - att.facing * 0.5, p.lift + 2.6, 0.6));
   }
@@ -483,18 +517,26 @@ export class BattleController {
     else if (id === 'chair') p.chairHit(dir);
     else if (id === 'shoe') p.shoeHit(dir);
     else if (id === 'hammer') p.hammerHit();
+    // 空中命中：往上托一下並短暫滯空，接得到下一擊（上勾拳本身就會再打上去）
+    if (wasAir && id !== 'uppercut') p.juggle(JUGGLE.liftVy, JUGGLE.hangTime, JUGGLE.pushKeep);
     this.ai.interrupt();
     p.setAiPose('idle', dir);
     this.dom.alert.hidden = true;
     this.hits++;
     this.handleDialogue(this.director.onHit(this.gameTime));
 
+    // 打擊感：停格、閃白光、粒子、震動（連擊越高震得越大）
     const big = BIG_HITS.has(id) || (id === 'club' && segment === 2);
-    const s = 1;
-    this.particles.burst(at, 'star', Math.round((big ? 6 : 3) * s));
-    this.particles.burst(at, 'chip', Math.round((big ? 10 : 5) * s));
-    this.words.add(m.words[segment % m.words.length], at.x, at.y + 0.6, '#E8392B', 1);
-    this.kick((big ? 0.9 : 0.4) * s);
+    const E = EFFECTS;
+    const tier = big ? 1 : 0;
+    this.hitStop = Math.max(this.hitStop, big ? E.hitStop.heavy : E.hitStop.light);
+    p.hitFlash(E.hitFlash.time);
+    this.particles.burst(at, 'star', E.hitParticles.star[tier]);
+    this.particles.burst(at, 'chip', E.hitParticles.chip[tier]);
+    this.words.add(m.words[segment % m.words.length], at.x, at.y + 0.6, '#E8392B', big ? 1.25 : 1.05);
+    if (wasAir) this.words.add('空中！', at.x - dir * 1.2, at.y + 1.5, '#7FD3FF', 0.75);
+    const comboBoost = Math.min(E.hitShake.maxCombo, res.combo * E.hitShake.perCombo);
+    this.kick((big ? E.hitShake.heavy : E.hitShake.light) * (1 + comboBoost));
     this.showScore(res.lines, at);
     // 連擊達 10 的倍數：木偶在地面上時噴飛（鐵錘本來就會在手風琴後噴飛）
     if (res.comboMilestone && !p.airborne && id !== 'hammer') p.explode(0.8, prefersReducedMotion());
@@ -593,6 +635,8 @@ export class BattleController {
     this.input.setEnabled(false);
     this.player.attack = null;
     this.shoes.clear();
+    this.ghosts.clear();
+    this.hitStop = 0;
     this.puppet.forceReassemble();
     this.puppet.clearStatus();
     this.puppet.setAiPose('idle', -1);
@@ -634,6 +678,8 @@ export class BattleController {
     this.showT = 0;
     this.input.setEnabled(false);
     this.shoes.clear();
+    this.ghosts.clear();
+    this.hitStop = 0;
     this.resetAi();
     const p = this.puppet;
     const pl = this.player;
@@ -817,6 +863,8 @@ export class BattleController {
     this.input.setEnabled(false);
     this.player.attack = null;
     this.shoes.clear();
+    this.ghosts.clear();
+    this.hitStop = 0;
     this.particles.clear();
     this.words.clear();
     this.dom.alert.hidden = true;
@@ -1046,6 +1094,8 @@ export class BattleController {
     this.clearShow();
     this.bubble.dispose();
     this.shoes.clear();
+    this.ghosts.clear();
+    this.hitStop = 0;
     this.particles.clear();
     this.words.clear();
     this.puppet.dispose();
