@@ -69,6 +69,7 @@ export function BattleScreen() {
         },
       },
       { dLines: filledD(ses) },
+      battleStore.get().difficulty,
     );
     ctrl.current = c;
     if (import.meta.env.DEV) {

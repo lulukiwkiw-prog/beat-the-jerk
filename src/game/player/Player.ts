@@ -23,7 +23,12 @@ export class Player {
   cooldowns: Partial<Record<MoveId, number>> = {};
   dodge = 0;
   dodgeCd = 0;
+  /** 上次閃避開始後經過的秒數（判斷閃避成功用） */
+  dodgeAge = Infinity;
   stun = 0;
+  /** 困難模式：被擊倒（躺下再起身）與起身後的無敵時間 */
+  down = false;
+  invuln = 0;
   /** 致命一擊演出：集氣（0～1）、推出光波（0～1） */
   powerUp = 0;
   thrust = 0;
@@ -62,7 +67,9 @@ export class Player {
     this.attack = null;
     this.cooldowns = {};
     this.buffered = null;
-    this.dodge = this.dodgeCd = this.stun = this.hop = 0;
+    this.dodge = this.dodgeCd = this.stun = this.hop = this.invuln = 0;
+    this.dodgeAge = Infinity;
+    this.down = false;
   }
 
   get busy() {
@@ -92,6 +99,7 @@ export class Player {
     if (this.dodgeCd > 0 || this.attack || this.stun > 0) return false;
     this.dodge = PLAYER.dodgeTime;
     this.dodgeCd = PLAYER.dodgeCooldown;
+    this.dodgeAge = 0;
     this.vx = -this.facing * PLAYER.dodgeSpeed;
     return true;
   }
@@ -100,6 +108,16 @@ export class Player {
     this.vx = dir * PLAYER.hitPush;
     this.stun = PLAYER.hitStun;
     this.attack = null;
+  }
+
+  /** 困難模式：被擊倒，getUp 秒內起身，起身後 invulnerable 秒無敵。 */
+  knockedDown(dir: number, push: number, getUp: number, invulnerable: number) {
+    this.vx = dir * push;
+    this.stun = getUp;
+    this.down = true;
+    this.invuln = getUp + invulnerable;
+    this.attack = null;
+    this.buffered = null;
   }
 
   /** 取出到期前的預約招式（目前沒有在出招時）。 */
@@ -122,6 +140,9 @@ export class Player {
     for (const k of Object.keys(this.cooldowns) as MoveId[]) this.cooldowns[k] = Math.max(0, (this.cooldowns[k] ?? 0) - dt);
     this.dodgeCd = Math.max(0, this.dodgeCd - dt);
     this.stun = Math.max(0, this.stun - dt);
+    if (this.stun === 0) this.down = false;
+    this.invuln = Math.max(0, this.invuln - dt);
+    this.dodgeAge += dt;
     this.bob += dt;
     if (this.dodge > 0) {
       this.dodge = Math.max(0, this.dodge - dt);
@@ -218,7 +239,9 @@ export class Player {
     }
     this.bodyYaw += (face - this.bodyYaw) * Math.min(1, frameDt * yawRate);
     L.body.rotation.y = this.bodyYaw;
-    L.body.rotation.z = this.stun > 0 ? 0.22 * this.facing : this.dodge > 0 ? 0.3 * this.facing : 0;
+    // 擊倒：一屁股跌坐在地、身體往後仰，最後 0.35 秒爬起來
+    const downK = this.down && this.stun > 0 ? Math.min(1, this.stun / 0.35) : 0;
+    L.body.rotation.z = downK ? this.facing * 0.45 * downK : this.stun > 0 ? 0.22 * this.facing : this.dodge > 0 ? 0.3 * this.facing : 0;
     const bob = Math.sin(this.bob * 5) * 0.06;
     const A = { shL: [-0.5 + bob, 0], elL: -1.9, shR: [-0.35 - bob, 0], elR: -1.7 } as Record<'shL' | 'shR', [number, number]> & { elL: number; elR: number };
     let open = false;
@@ -343,6 +366,15 @@ export class Player {
       L.legL.rotation.x = tuck;
       L.legR.rotation.x = tuck + 0.3;
     }
+    if (downK) {
+      // 跌坐：雙腿往前伸、屁股著地、雙手亂揮
+      L.legL.rotation.x = L.legR.rotation.x = -1.45 * downK;
+      L.root.position.y -= 1.55 * downK;
+      const flail = Math.sin(this.bob * 18) * 0.35;
+      A.shL = [-2.3 + flail, -0.5];
+      A.shR = [-2.3 - flail, 0.5];
+      A.elL = A.elR = -0.4;
+    }
     if (this.script?.sit) {
       // 坐在舞台邊緣：雙腿往前、身體下沉、手放在膝上
       L.legL.rotation.x = L.legR.rotation.x = -1.45;
@@ -367,6 +399,8 @@ export class Player {
       const o = open && (beamHands || openArm === side);
       g.scale.set(o ? 0.5 : 1, o ? 1.35 : 1.05, o ? 1.2 : 1.1);
     }
+    // 起身後無敵：閃爍
+    L.root.visible = !(this.invuln > 0 && this.stun <= 0 && Math.floor(this.bob * 12) % 2 === 0);
     // 手上的武器：棍棒、鐵錘整招都拿著；投擲物出手後就不在手上
     const id = a?.move.id;
     const before = !!a && a.t < a.move.windup;

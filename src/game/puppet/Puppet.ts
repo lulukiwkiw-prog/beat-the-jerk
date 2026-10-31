@@ -57,6 +57,8 @@ export class Puppet {
   private accT = 0;
   private explodeAfterAcc = false;
   private bucket: Object3D | null = null;
+  /** 困難模式閃避：剩餘無敵時間 */
+  private evadeT = 0;
   private fadeMats: MeshStandardMaterial[] | null = null;
   readonly meshes = {} as Record<PaintPartId, Mesh>;
   readonly fixed = {} as Record<FixedPartId, Mesh>;
@@ -237,9 +239,21 @@ export class Puppet {
   get isScattered() {
     return this.scatter !== null;
   }
-  /** 噴飛或組回期間不能被命中 */
+  /** 噴飛、組回、閃避期間不能被命中 */
   get invulnerable() {
-    return this.scatter !== null;
+    return this.scatter !== null || this.evadeT > 0;
+  }
+
+  get isEvading() {
+    return this.evadeT > 0;
+  }
+
+  /** 困難模式：往後跳開閃避（dir＝往哪邊跳），期間攻擊視為揮空。 */
+  evade(dir: number, time: number, speed: number) {
+    this.evadeT = time;
+    this.vx = dir * speed;
+    this.sy.vel += 5;
+    this.pose.torsoZ.vel += dir * 5;
   }
   get squashScaleY() {
     return this.sy.v;
@@ -433,7 +447,7 @@ export class Puppet {
 
   /** 清除暫時狀態（暈眩、套頭水桶、手風琴、轉圈）：重新開始、道歉轉場時呼叫。 */
   clearStatus() {
-    this.spinT = this.stunT = this.accT = 0;
+    this.spinT = this.stunT = this.accT = this.evadeT = 0;
     this.explodeAfterAcc = false;
     this.bucket?.removeFromParent();
     this.bucket = null;
@@ -519,6 +533,7 @@ export class Puppet {
     this.waveT = Math.max(0, this.waveT - dt);
     this.downT = Math.max(0, this.downT - dt);
     this.spinT = Math.max(0, this.spinT - dt);
+    this.evadeT = Math.max(0, this.evadeT - dt);
     if (this.stunT > 0) {
       this.stunT = Math.max(0, this.stunT - dt);
       if (this.stunT === 0) {

@@ -1,11 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
 import { bt, fillWanted, startBattle, waitPhase, watchConsole } from './helpers';
 
-async function toBattle(page: Page, round = 12) {
+async function toBattle(page: Page, round = 12, difficulty: '簡單' | '困難' = '簡單') {
   await page.goto(`/?round=${round}`);
   await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
   await page.getByTestId('go-paint').click();
   await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
+  if (difficulty === '困難') {
+    await page.getByTestId('go-duel').click();
+    await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
+    const skip = page.getByRole('button', { name: '略過' });
+    if (await skip.isVisible()) await skip.click();
+    await page.getByRole('radio', { name: '困難' }).click();
+    await page.getByTestId('begin-battle').click();
+    await waitPhase(page, 'fight');
+    return;
+  }
   await startBattle(page);
 }
 
@@ -19,9 +29,12 @@ test('第一次進開戰準備會自動顯示操作教學，之後不再自動�
   await page.getByTestId('go-duel').click();
   await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('tutorial')).toBeHidden();
-  // 困難模式在第 5 階段才有，現在只顯示簡單
-  await expect(page.getByRole('radio', { name: '簡單' })).toBeVisible();
-  await expect(page.getByRole('radio', { name: '困難' })).toHaveCount(0);
+  // 兩種難度，說明跟著切換
+  await expect(page.getByRole('radio', { name: '簡單' })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: '困難' }).click();
+  await expect(page.getByTestId('difficulty-note')).toContainText('困難模式');
+  await page.getByRole('radio', { name: '簡單' }).click();
+  await expect(page.getByTestId('difficulty-note')).toContainText('簡單模式');
   // 回合固定 1 分鐘：沒有長度選項，只有說明
   await expect(page.getByRole('radio', { name: '5 分鐘' })).toHaveCount(0);
   await expect(page.getByTestId('round-note')).toContainText('每回合 1 分鐘');
@@ -247,4 +260,56 @@ test('階段 4 招式：迴旋踢、飛踢（逐幀判定只算一次）、棍�
   await expect.poll(async () => (await b.battle()).scattered, { timeout: 10_000 }).toBe(true);
   await expect.poll(async () => (await b.battle()).scattered, { timeout: 20_000 }).toBe(false);
   expect(errors).toEqual([]);
+});
+
+test('困難模式：木偶會走位；被打中會倒地、1 秒內起身並短暫無敵；閃過一拳 +20', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = watchConsole(page);
+  await toBattle(page, 300, '困難');
+  const b = bt(page);
+  expect((await b.battle()).difficulty).toBe('hard');
+  // 走位：玩家站遠，木偶自己靠過來
+  await b.setPlayerX(-7);
+  const x0 = (await b.battle()).puppetX;
+  await expect.poll(async () => (await b.battle()).puppetX, { timeout: 20_000 }).toBeLessThan(x0 - 1);
+
+  // 站著不動被打中：倒地 → 起身 → 無敵
+  await expect.poll(async () => (await b.battle()).playerDown, { timeout: 40_000 }).toBe(true);
+  await page.screenshot({ path: 'screenshots/stage-5/desktop-hard-knockdown.png' });
+  // 起身那一刻還在無敵中（同一個快照裡檢查）
+  let up = await b.battle();
+  await expect.poll(async () => (up = await b.battle()).playerDown, { timeout: 10_000, intervals: [30] }).toBe(false);
+  expect(up.playerInvuln).toBeGreaterThan(0);
+  expect((await b.battle()).score).toBe(0);
+
+  // 等下一拳的預備動作，按閃避：+20
+  await expect.poll(async () => (await b.battle()).playerInvuln, { timeout: 10_000 }).toBe(0);
+  await page.waitForFunction(() => {
+    const s = (window as unknown as { __bt: { battle: { debugState(): { aiPhase: string; playerX: number; puppetX: number } } } }).__bt.battle.debugState();
+    return s.aiPhase === 'windup';
+  }, null, { timeout: 40_000, polling: 16 });
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await b.battle()).dodges, { timeout: 10_000 }).toBe(1);
+  expect((await b.battle()).score).toBe(20);
+  expect((await b.battle()).playerDown).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('困難模式：木偶偶爾閃開攻擊，閃開時攻擊落空', async ({ page }) => {
+  test.setTimeout(240_000);
+  await toBattle(page, 300, '困難');
+  const b = bt(page);
+  // 連續出招，直到木偶閃開一次
+  let evaded = false;
+  for (let i = 0; i < 40 && !evaded; i++) {
+    const s = await b.battle();
+    await b.setPlayerX(s.puppetX - 2.6);
+    await page.keyboard.press('1');
+    for (let k = 0; k < 8 && !evaded; k++) {
+      evaded = (await b.battle()).puppetEvading;
+      await page.waitForTimeout(60);
+    }
+    await page.waitForTimeout(400);
+  }
+  expect(evaded).toBe(true);
 });

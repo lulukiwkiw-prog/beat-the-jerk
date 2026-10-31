@@ -3,7 +3,7 @@ import { devRoundOverride } from '../game/engine/roundClock';
 import { readJSON, writeJSON } from '../storage/safeStorage';
 import { createStore, useStore } from './store';
 
-export type Difficulty = 'easy';
+export type Difficulty = 'easy' | 'hard';
 
 export interface BattleOptions {
   difficulty: Difficulty;

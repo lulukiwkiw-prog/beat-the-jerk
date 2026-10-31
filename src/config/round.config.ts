@@ -58,3 +58,37 @@ export const FINISHER = {
   /** 終結技加分 */
   score: 100,
 } as const;
+
+/** 困難模式木偶（SPEC 第 11 節） */
+export const HARD_AI = {
+  /** 出拳預備動作（秒）、出拳時間 */
+  windup: 0.5,
+  punchTime: 0.3,
+  /** 兩次出拳之間至少間隔（秒）＋隨機 */
+  cooldown: 2,
+  cooldownRandom: 1.2,
+  /** 拳頭打得到的中心距離（H） */
+  reach: 0.75,
+  /** 移動速度、想保持的距離（場景單位）、靠太近時後退的距離 */
+  walkSpeed: 2.6,
+  preferDist: 2.9,
+  tooClose: 2.0,
+  /** 偶爾停下來喘口氣（秒） */
+  pauseMin: 0.4,
+  pauseMax: 1.2,
+  pauseChance: 0.25,
+  /** 閃避：機率、之後至少幾秒不再閃、無敵時間、往後跳的速度 */
+  dodgeChance: 0.3,
+  dodgeCooldown: 3,
+  dodgeTime: 0.45,
+  dodgeSpeed: 9,
+  /** 打中玩家後多等幾秒才能再出拳（避免連續壓制） */
+  afterHitRest: 2.5,
+} as const;
+
+/** 困難模式玩家被擊倒：起身時間（< 1 秒）、起身後無敵時間 */
+export const KNOCKDOWN = {
+  getUp: 0.9,
+  invulnerable: 1.5,
+  push: 9,
+} as const;

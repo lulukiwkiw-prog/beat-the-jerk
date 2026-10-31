@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ROUND } from '../config/round.config';
 import { dispatch } from '../state/app';
-import { devRound, markTutorialSeen, tutorialSeen, updateBattle, useBattleOptions } from '../state/battle';
+import { devRound, markTutorialSeen, tutorialSeen, updateBattle, useBattleOptions, type Difficulty } from '../state/battle';
+import { SCORING } from '../config/scoring.config';
 import { Segmented } from '../ui/Segmented';
 import { Tutorial } from '../ui/Tutorial';
 import { useSession } from '../state/session';
@@ -37,10 +38,19 @@ export function PrepScreen() {
         <h1>開戰準備</h1>
       </header>
       <section className="prep-card">
-        <Segmented<'easy'> label="難度" value={o.difficulty} onChange={(difficulty) => updateBattle({ difficulty })} options={[{ value: 'easy', label: '簡單' }]} />
+        <Segmented<Difficulty>
+          label="難度"
+          value={o.difficulty}
+          onChange={(difficulty) => updateBattle({ difficulty })}
+          options={[{ value: 'easy', label: '簡單' }, { value: 'hard', label: '困難' }]}
+        />
         <p className="note" data-testid="round-note">{t(`每回合 ${ROUND.defaultLength / 60} 分鐘。剩 ${ROUND.finisherAskAt} 秒時，可以選擇給{他}致命一擊，或再打 ${ROUND.extendBy / 60} 分鐘。`)}</p>
         {dev != null && <p className="note dev">開發測試：這次回合改為 {dev} 秒。</p>}
-        <p className="note">簡單模式：木偶不會走動，每隔一陣子會出一拳，頭上冒出「！」時閃開就好。沒有輸的結局。</p>
+        {o.difficulty === 'easy' ? (
+          <p className="note" data-testid="difficulty-note">簡單模式：木偶不會走動，每隔一陣子會出一拳，頭上冒出「！」時閃開就好。沒有輸的結局。</p>
+        ) : (
+          <p className="note" data-testid="difficulty-note">困難模式：木偶會走位、靠近出拳，偶爾還會閃開。看到「！」就按閃避，閃過一拳 +{SCORING.dodgeBonus} 分。被打倒會馬上爬起來，起身後短暫無敵。沒有輸的結局。</p>
+        )}
         <div className="prep-actions">
           <button type="button" className="btn" onClick={() => setShowTutorial(true)} aria-expanded={showTutorial}>
             操作說明

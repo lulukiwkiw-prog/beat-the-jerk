@@ -52,6 +52,11 @@ export interface BattleDebug {
   bucket: boolean;
   accordion: boolean;
   clockLength: number;
+  difficulty: string;
+  puppetEvading: boolean;
+  playerDown: boolean;
+  playerInvuln: number;
+  dodges: number;
 }
 
 export const bt = (page: Page) => ({

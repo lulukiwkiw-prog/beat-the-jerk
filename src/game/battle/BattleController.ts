@@ -3,7 +3,10 @@ import { CAMERA, GAME } from '../../config/game.config';
 import { EFFECTS } from '../../config/effects.config';
 import { H, MOVE_SETS, MOVES, PLAYER, type DashMove, type MeleeMove, type MoveId, type MoveKind, type ThrowMove } from '../../config/moves.config';
 import { PUPPET } from '../../config/puppet.config';
-import { EASY_AI, FINISHER, ROUND } from '../../config/round.config';
+import { EASY_AI, FINISHER, HARD_AI, KNOCKDOWN, ROUND } from '../../config/round.config';
+import { SCORING } from '../../config/scoring.config';
+import { HardAI } from '../enemy/hardAI';
+import type { Difficulty } from '../../state/battle';
 import { prefersReducedMotion, settingsStore, vibrate } from '../../state/settings';
 import { ComicWords } from '../effects/comicWords';
 import { EnergyBeam } from '../effects/beam';
@@ -106,7 +109,12 @@ export class BattleController {
   private particles: Particles;
   private words: ComicWords;
   private shoes: Projectiles;
-  private ai = new EasyAI();
+  private easyAi = new EasyAI();
+  private hardAi = new HardAI();
+  /** 困難模式：玩家出招後安排的閃避（倒數秒數、往哪邊跳） */
+  private pendingEvade: { t: number; dir: number } | null = null;
+  /** 木偶開始預備出拳時與玩家的距離（判斷閃避成功） */
+  private windupDist = Infinity;
   ledger = new ScoreLedger();
   clock: RoundClock;
   kind: MoveKind = 'hand';
@@ -138,6 +146,8 @@ export class BattleController {
   private director: DialogueDirector;
   private bubble: DialogueBubble;
   private hits = 0;
+  /** 困難模式成功閃避次數 */
+  private dodges = 0;
   private early = false;
   private showT = 0;
   private warmDuration = 0;
@@ -154,6 +164,7 @@ export class BattleController {
     private readonly roundLength: number,
     private readonly ev: BattleEvents,
     private readonly script: BattleScript = { dLines: [] },
+    readonly difficulty: Difficulty = 'easy',
   ) {
     this.director = new DialogueDirector(script.dLines);
     this.bubble = new DialogueBubble(dom.bubble);
@@ -197,7 +208,7 @@ export class BattleController {
     this.player.reset();
     this.puppet.setStance(true, -1);
     this.puppet.reset(GAME.puppetStartX);
-    this.ai.reset();
+    this.resetAi();
     this.shoes.clear();
     this.particles.clear();
     this.words.clear();
@@ -216,6 +227,8 @@ export class BattleController {
     this.input.setEnabled(false);
     this.dom.alert.hidden = true;
     this.hits = 0;
+    this.dodges = 0;
+    this.windupDist = Infinity;
     this.early = false;
     this.clearShow();
     this.bubble.hide();
@@ -338,14 +351,37 @@ export class BattleController {
     const hits = this.shoes.update(dt, { x: p.x, halfWidth: PUPPET.halfWidth, bottom: p.lift, top: p.lift + H, active: this.live && !p.invulnerable });
     for (const h of hits) this.applyHit(h.id, h.hitId, 0, new Vector3(h.x, h.y, 0.6));
 
-    // 木偶 AI（簡單模式）
+    // 木偶 AI（簡單／困難模式）
     const side = (Math.sign(pl.x - p.x) || -1) as -1 | 1;
     // 面對面：木偶轉身朝向玩家，擺出前後腳站姿
     if (!p.airborne) p.setStance(true, side);
+    // 困難模式：玩家出招時木偶往後跳開
+    if (this.pendingEvade) {
+      this.pendingEvade.t -= dt;
+      if (this.pendingEvade.t <= 0) {
+        if (this.live && !p.airborne && !p.invulnerable) {
+          p.evade(this.pendingEvade.dir, HARD_AI.dodgeTime, HARD_AI.dodgeSpeed);
+          this.words.add('閃開！', p.x, 5.6, '#C9D2F2', 0.7);
+        }
+        this.pendingEvade = null;
+      }
+    }
     // 暈眩（水桶套頭）、手風琴、壓扁中不出拳
     const canAct = !p.invulnerable && !p.airborne && !p.isDown && !p.isStunned && !p.isAccordion && !p.isFlat;
-    for (const e of this.ai.update(dt, this.live && canAct, side)) {
+    const aiEvents = this.difficulty === 'hard'
+      ? this.hardAi.update(dt, {
+        canAct: this.live && canAct,
+        playerSide: side,
+        dist: Math.abs(pl.x - p.x),
+        playerVulnerable: pl.invuln <= 0 && pl.stun <= 0,
+        reach: HARD_AI.reach * H,
+      })
+      : this.easyAi.update(dt, this.live && canAct, side);
+    // 困難模式走位
+    if (this.difficulty === 'hard' && this.live && canAct && this.hardAi.move) p.vx = this.hardAi.move * HARD_AI.walkSpeed;
+    for (const e of aiEvents) {
       if (e.type === 'windup') {
+        this.windupDist = Math.abs(pl.x - p.x);
         p.setAiPose('windup', e.side);
         this.dom.alert.hidden = false;
       } else if (e.type === 'strike') {
@@ -400,7 +436,13 @@ export class BattleController {
 
   /** 招式開始時的提示（鐵錘蓄力） */
   private onAttackStart(att: ActiveAttack | null) {
-    if (att?.move.id === 'hammer') this.words.add('蓄力…', this.player.x, 5.7, '#FFC63A', 0.8);
+    if (!att) return;
+    if (att.move.id === 'hammer') this.words.add('蓄力…', this.player.x, 5.7, '#FFC63A', 0.8);
+    // 困難模式：木偶看到玩家出招，偶爾在判定前往後跳開（閃避後至少 3 秒不再閃）
+    const p = this.puppet;
+    if (this.difficulty === 'hard' && !this.pendingEvade && Math.abs(p.x - this.player.x) < 7 && this.hardAi.tryDodge()) {
+      this.pendingEvade = { t: Math.max(0, att.move.windup - 0.15), dir: Math.sign(p.x - this.player.x) || 1 };
+    }
   }
 
   /**
@@ -465,16 +507,47 @@ export class BattleController {
     });
   }
 
+  private get ai() {
+    return this.difficulty === 'hard' ? this.hardAi : this.easyAi;
+  }
+
+  private resetAi() {
+    this.easyAi.reset();
+    this.hardAi.reset();
+    this.pendingEvade = null;
+  }
+
+  /**
+   * 木偶出拳。簡單模式只把玩家擊退；困難模式會擊倒（1 秒內起身、1.5 秒無敵）。
+   * 預備出拳時在拳頭範圍附近、出拳前剛閃避過＝閃避成功（困難模式 +20）。
+   */
   private puppetStrike() {
     const p = this.puppet;
     const pl = this.player;
+    const hard = this.difficulty === 'hard';
+    const reach = (hard ? HARD_AI.reach : EASY_AI.reach) * H;
     const dx = Math.abs(pl.x - p.x);
-    if (dx < EASY_AI.reach * H && pl.dodge <= 0) {
-      pl.knockedBack(Math.sign(pl.x - p.x) || -1);
-      this.words.add('唉唷！', pl.x, 4.6, '#FFFFFF', 0.8);
-      this.kick(0.5);
-    } else if (pl.dodge > 0 && dx < EASY_AI.reach * H * 1.2) {
+    const dir = Math.sign(pl.x - p.x) || -1;
+    if (pl.invuln > 0) return;
+    const dodged = pl.dodgeAge < PLAYER.dodgeTime + EASY_AI.punchTime + 0.2 && this.windupDist < reach * 1.3;
+    if (dx < reach && pl.dodge <= 0 && !dodged) {
+      if (hard) {
+        pl.knockedDown(dir, KNOCKDOWN.push, KNOCKDOWN.getUp, KNOCKDOWN.invulnerable);
+        this.hardAi.restAfterHit();
+        this.words.add('倒地！', pl.x, 4.6, '#FFFFFF', 0.9);
+        this.kick(0.8);
+      } else {
+        pl.knockedBack(dir);
+        this.words.add('唉唷！', pl.x, 4.6, '#FFFFFF', 0.8);
+        this.kick(0.5);
+      }
+    } else if (dodged) {
       this.words.add('閃過！', pl.x, 4.8, '#2FB896', 0.8);
+      if (hard) {
+        this.ledger.bonus(SCORING.dodgeBonus);
+        this.words.add(`+${SCORING.dodgeBonus} 閃避成功！`, pl.x, 5.6, '#FFC63A', 0.85, 'score');
+        this.dodges++;
+      }
     }
   }
 
@@ -561,7 +634,7 @@ export class BattleController {
     this.showT = 0;
     this.input.setEnabled(false);
     this.shoes.clear();
-    this.ai.reset();
+    this.resetAi();
     const p = this.puppet;
     const pl = this.player;
     p.forceReassemble();
@@ -747,7 +820,7 @@ export class BattleController {
     this.particles.clear();
     this.words.clear();
     this.dom.alert.hidden = true;
-    this.ai.reset();
+    this.resetAi();
     const p = this.puppet;
     p.forceReassemble();
     p.clearStatus();
@@ -866,7 +939,7 @@ export class BattleController {
       aspect: this.host.camera.aspect,
       fov: this.host.camera.fov,
       actors: [
-        { x: pl.rig.root.position.x, halfWidth: 1.0, top: PLAYER_TOP + 0.3 + Math.max(0, pl.rig.root.position.y) },
+        { x: pl.rig.root.position.x, halfWidth: pl.down ? 1.9 : 1.0, top: PLAYER_TOP + 0.3 + Math.max(0, pl.rig.root.position.y) },
         { x: p.x, halfWidth: PUPPET.halfWidth + (p.airborne ? 0.6 : 0), top: p.lift + PUPPET.height },
       ],
     });
@@ -944,6 +1017,11 @@ export class BattleController {
       particles: this.particles.count,
       decals: this.puppet.decals.count,
       aiPhase: this.ai.phase,
+      difficulty: this.difficulty,
+      puppetEvading: this.puppet.isEvading,
+      playerDown: this.player.down,
+      playerInvuln: this.player.invuln,
+      dodges: this.dodges,
       attacking: !!this.player.attack,
       bubble: this.bubble.visible ? (this.dom.bubble.textContent ?? '') : '',
       hits: this.hits,

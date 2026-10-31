@@ -6,7 +6,7 @@ const SIZES = [
   { name: 'mobile-landscape', width: 844, height: 390 },
   { name: 'desktop', width: 1440, height: 900 },
 ];
-const DIR = 'screenshots/stage-4';
+const DIR = 'screenshots/stage-5';
 
 for (const s of SIZES) {
   test(`截圖 ${s.name}`, async ({ page }) => {
@@ -31,6 +31,9 @@ for (const s of SIZES) {
     await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
     const skip = page.getByRole('button', { name: '略過' });
     if (await skip.isVisible()) await skip.click();
+    // 困難模式
+    await page.getByRole('radio', { name: '困難' }).click();
+    await page.screenshot({ path: `${DIR}/${s.name}-02b-prep.png` });
     await page.getByTestId('begin-battle').click();
     await expect(page.getByTestId('battle-stage').locator('canvas')).toBeVisible({ timeout: 20_000 });
     await page.waitForTimeout(800);
