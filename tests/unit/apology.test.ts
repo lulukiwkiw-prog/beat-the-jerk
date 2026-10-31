@@ -10,15 +10,21 @@ describe('道歉稿', () => {
     expect(joinFeelings(['生氣', '委屈'])).toBe('生氣和委屈');
     expect(joinFeelings(['生氣', '委屈', '難過'])).toBe('生氣、委屈和難過');
   });
-  it('心情、想聽的話全空：只有 A 段、道歉段、結語，沒有空引號或變數名稱', () => {
+  it('心情、想聽的話全空：用通用台詞補上，沒有空引號或變數名稱', () => {
     const p = buildApology(base);
-    expect(p).toHaveLength(3);
+    expect(p).toHaveLength(5);
     const s = text(p);
     expect(s).not.toMatch(/「」|\{|\}|undefined|null/);
     expect(s).not.toContain('我當時還說');
-    expect(s).not.toContain('原來這件事');
     expect(s).toContain('「明明是他沒做事，卻當眾怪我。」');
+    expect(s).toContain('我知道，那讓你很不好受。');
+    expect(s).toContain('這不是你的錯。');
     expect(s).toContain('原不原諒，由你決定。');
+  });
+  it('通緝單整個沒填：每一段都用通用台詞，讀起來通順', () => {
+    const p = buildApology({ ...base, a: '', self: '妳', other: '她' });
+    expect(p.map((x) => x[0])).toEqual(['那件讓妳難受的事，', '我知道，那讓妳很不好受。', '我不應該那樣對妳。', '這不是妳的錯。', '原不原諒，由妳決定。']);
+    expect(text(p)).not.toMatch(/「|」|\{|\}|undefined|null/);
   });
   it('完整填寫：段落順序與內容', () => {
     const p = buildApology({
@@ -33,7 +39,7 @@ describe('道歉稿', () => {
   it('只有心情、只有想聽的話的組合', () => {
     expect(buildApology({ ...base, feelings: ['失望'] }).map((x) => x[0])).toContain('原來這件事，讓你感到失望。');
     const p = buildApology({ ...base, d: ['我不應該那樣對你', '對不起'] });
-    expect(p[2]).toEqual(['我不應該那樣對你', '對不起']);
+    expect(p[3]).toEqual(['我不應該那樣對你', '對不起']);
   });
   it('保留原文（含 <script>、表情符號），不改寫', () => {
     const p = buildApology({ ...base, a: '<script>alert(1)</script>😡' });

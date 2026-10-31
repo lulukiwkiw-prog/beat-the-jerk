@@ -3,6 +3,7 @@ import { bt, fillWanted, startBattle, waitPhase, watchConsole } from './helpers'
 
 async function toBattle(page: Page, round = 12, difficulty: '簡單' | '困難' = '簡單') {
   await page.goto(`/?round=${round}`);
+  await page.getByTestId('mood-yes').click();
   await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
   await page.getByTestId('go-paint').click();
   await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
@@ -48,7 +49,7 @@ test('命中得分、落空不得分、投射物碰撞、冷卻、暫停、時�
   // 落空：距離太遠，不得分、不計連擊
   await b.setPlayerX(-7);
   await page.keyboard.press('5');
-  await expect(page.getByTestId('move-slap').locator('.cdt')).toBeVisible();
+  await expect.poll(async () => (await b.battle()).lastMove).toBe('slap');
   await expect.poll(async () => (await b.battle()).attacking).toBe(false);
   expect((await b.battle()).score).toBe(0);
   expect((await b.battle()).combo).toBe(0);

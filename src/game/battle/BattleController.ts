@@ -1209,6 +1209,7 @@ export class BattleController {
       showT: this.showT,
       flat: this.puppet.isFlat,
       clockLength: this.clock.lengthSec,
+      lastMove: this.player.lastMove,
       events: this.events.current,
       padHits: this.padHits,
       stunned: this.puppet.isStunned,

@@ -13,6 +13,9 @@ for (const s of SIZES) {
     test.setTimeout(240_000);
     await page.setViewportSize({ width: s.width, height: s.height });
     await page.goto('/?round=15');
+    // 一開始先問要不要記錄心情
+    await page.screenshot({ path: `${DIR}/${s.name}-00-mood.png` });
+    await page.getByTestId('mood-yes').click();
     await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
     await page.getByRole('button', { name: '委屈', exact: true }).click();
     await page.getByTestId('field-d-0').fill('不是你的錯');

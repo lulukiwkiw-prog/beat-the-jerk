@@ -30,6 +30,8 @@ export class Player {
   /** 困難模式：被擊倒（躺下再起身）與起身後的無敵時間 */
   down = false;
   invuln = 0;
+  /** 最近一次出的招（測試用） */
+  lastMove: MoveId | null = null;
   /** 小型活動暫時改變的冷卻（例：鞋子時間丟鞋子 0.3 秒） */
   cdOverride: Partial<Record<MoveId, number>> = {};
   /** 演出時退場（道歉時不出場） */
@@ -101,6 +103,7 @@ export class Player {
     if (this.busy || this.cooldownOf(id) > 0) return null;
     this.attack = startAttack(id, seq, this.facing);
     this.cooldowns[id] = this.cdOverride[id] ?? MOVES[id].cooldown;
+    this.lastMove = id;
     return this.attack;
   }
 

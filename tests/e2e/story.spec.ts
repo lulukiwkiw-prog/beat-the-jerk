@@ -25,6 +25,7 @@ async function finishCalm(page: Page) {
 test('完整流程：戰鬥 D 對話 → 道歉稿 → 值得聽到 → 結局「原諒」→ 降溫 → 下一步', async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto('/?round=8');
+  await page.getByTestId('mood-yes').click();
   await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
   await fillAll(page);
   await page.getByTestId('go-paint').click();
@@ -110,6 +111,9 @@ test('結局「我還有其他爛人要打」：清空通緝單，不沿用外�
   await page.getByRole('button', { name: '略過' }).click();
   await expect(page.getByTestId('reuse-look')).toBeVisible();
   await page.getByRole('button', { name: '否', exact: true }).click();
+  // 新的對手：重新問要不要記錄心情
+  await expect(page.getByTestId('mood-choice')).toBeVisible();
+  await page.getByTestId('mood-yes').click();
   await expect(page.getByTestId('field-a')).toHaveValue('');
   await expect(page.getByTestId('field-d-0')).toHaveValue('');
   const painted = await page.evaluate(() => (window as unknown as { __bt: { paint: { paintedPixels(p: string): number } } }).__bt.paint.paintedPixels('torso'));

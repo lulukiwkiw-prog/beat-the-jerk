@@ -26,8 +26,7 @@ test('彩繪外觀：儲存到這台裝置、清空後套用回來、刪除；�
 
   // 重新整理後還在，可以刪除
   await page.reload();
-  await page.getByTestId('field-a').fill('再一次');
-  await page.getByTestId('go-paint').click();
+  await page.getByTestId('mood-skip').click();
   await expect(page.getByTestId('load-look-外觀 1')).toBeVisible();
   await page.getByRole('button', { name: '刪除 外觀 1' }).click();
   await page.getByRole('button', { name: '確定刪除' }).click();
@@ -37,6 +36,7 @@ test('彩繪外觀：儲存到這台裝置、清空後套用回來、刪除；�
 
 test('儲存這次內容：先列出項目、同意才存；讀回與刪除；設定裡清除所有資料', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('mood-yes').click();
   // 沒填 A 時不能存
   await expect(page.getByTestId('save-content-btn')).toBeDisabled();
   await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
@@ -55,6 +55,7 @@ test('儲存這次內容：先列出項目、同意才存；讀回與刪除；�
 
   // 重新整理：內容預設不在，按讀回才回來
   await page.reload();
+  await page.getByTestId('mood-yes').click();
   await expect(page.getByTestId('field-a')).toHaveValue('');
   await page.getByTestId('load-content').click();
   await expect(page.getByTestId('field-a')).toHaveValue('明明是他沒做事，卻當眾怪我。');
@@ -69,5 +70,6 @@ test('儲存這次內容：先列出項目、同意才存；讀回與刪除；�
   const left = await page.evaluate(() => Object.keys(window.localStorage).filter((k) => k.startsWith('btj.') && k !== 'btj.settings'));
   expect(left).toEqual([]);
   await page.reload();
+  await page.getByTestId('mood-yes').click();
   await expect(page.getByTestId('load-content')).toHaveCount(0);
 });

@@ -1,13 +1,29 @@
 import { expect, test } from '@playwright/test';
 import { watchConsole } from './helpers';
 
-test('A 未填時主要按鈕停用並說明原因', async ({ page }) => {
+test('一開始先問要不要記錄心情；選「要」才展開欄位，每一題都可以不填', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('go-paint')).toBeDisabled();
-  await expect(page.getByText('才能繼續')).toBeVisible();
-  // 只有空白也不算
-  await page.getByTestId('field-a').fill('   ');
-  await expect(page.getByTestId('go-paint')).toBeDisabled();
+  await expect(page.getByText('要記錄下此刻的心情嗎？')).toBeVisible();
+  await expect(page.getByTestId('field-a')).toHaveCount(0);
+  await page.getByTestId('mood-yes').click();
+  await expect(page.getByTestId('field-a')).toBeVisible();
+  await expect(page.getByTestId('mood-choice')).toHaveCount(0);
+  // 全部空白也能繼續
+  await expect(page.getByTestId('go-paint')).toBeEnabled();
+  await page.getByTestId('go-paint').click();
+  await expect(page.getByTestId('paint-stage')).toBeVisible();
+  // 回通緝單：欄位仍展開
+  await page.getByRole('button', { name: '← 回通緝單' }).click();
+  await expect(page.getByTestId('field-a')).toBeVisible();
+});
+
+test('跳過，直接開始：進彩繪室；右上角有隨機造型與出來決鬥', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('mood-skip').click();
+  await expect(page.getByTestId('paint-stage')).toBeVisible();
+  const head = page.locator('.screen-head');
+  await expect(head.getByTestId('random-look')).toBeVisible();
+  await expect(head.getByTestId('go-duel')).toBeVisible();
 });
 
 test('<script>、表情符號、300 字長文、全空白選填欄位都能正常顯示', async ({ page }) => {
@@ -18,6 +34,7 @@ test('<script>、表情符號、300 字長文、全空白選填欄位都能正�
     await d.dismiss();
   });
   await page.goto('/');
+  await page.getByTestId('mood-yes').click();
   const evil = '<script>alert(1)</script><img src=x onerror=alert(2)>';
   await page.getByTestId('field-d-0').fill(evil);
   await page.getByRole('button', { name: /再加一句/ }).click();
@@ -40,6 +57,7 @@ test('<script>、表情符號、300 字長文、全空白選填欄位都能正�
 test('達上限後無法再輸入；貼上超出時提示，且不截斷已輸入內容', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/');
+  await page.getByTestId('mood-yes').click();
   const b0 = page.getByTestId('field-d-0');
   const first = '甲'.repeat(78);
   await b0.fill(first);
@@ -60,6 +78,7 @@ test('達上限後無法再輸入；貼上超出時提示，且不截斷已輸�
 
 test('稱謂切換會替換介面文字', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('mood-yes').click();
   await page.getByRole('radio', { name: '妳' }).click();
   await page.getByRole('radio', { name: '她' }).click();
   await expect(page.getByText('A．妳為什麼想打爆這個人？')).toBeVisible();
@@ -70,6 +89,7 @@ test('稱謂切換會替換介面文字', async ({ page }) => {
 
 test('通緝單沒有「賤話」題；想聽的話可新增至 5 欄；自訂心情最多 5 個', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('mood-yes').click();
   await expect(page.getByTestId('field-b-0')).toHaveCount(0);
   const add = page.getByRole('button', { name: /再加一句（\d／5）/ });
   for (let i = 0; i < 4; i++) await add.click();

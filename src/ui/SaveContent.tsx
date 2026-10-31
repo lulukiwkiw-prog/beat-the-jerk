@@ -72,7 +72,7 @@ export function SaveContent() {
         </div>
       ) : (
         <div className="btn-row">
-          <button type="button" className="btn" onClick={() => setAsking(true)} disabled={!s.a.trim()} data-testid="save-content-btn">
+          <button type="button" className="btn" onClick={() => setAsking(true)} disabled={!s.a.trim() && !s.feelings.length && !s.d.some((l) => l.text.trim())} data-testid="save-content-btn">
             {saved ? '用目前內容覆蓋儲存' : '儲存這次內容'}
           </button>
           {saved && (

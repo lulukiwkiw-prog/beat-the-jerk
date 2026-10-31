@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FORM } from '../config/form.config';
 import { dispatch } from '../state/app';
 import { SaveContent } from '../ui/SaveContent';
-import { isWantedValid, newId, updateSession, useSession } from '../state/session';
+import { newId, updateSession, useSession } from '../state/session';
 import { fillPronouns, type OtherPronoun, type SelfPronoun } from '../state/text';
 import { CharField } from '../ui/CharField';
 import { Segmented } from '../ui/Segmented';
@@ -12,7 +12,6 @@ export function WantedScreen() {
   const s = useSession();
   const t = (x: string) => fillPronouns(x, s.self, s.other);
   const [custom, setCustom] = useState('');
-  const valid = isWantedValid(s);
   const allFeelings = [...FORM.feelings, ...s.customFeelings];
 
   const toggleFeeling = (f: string) =>
@@ -45,7 +44,31 @@ export function WantedScreen() {
           <span className="poster-tag">WANTED</span>
           <h2>情緒通緝單</h2>
         </div>
-        <p className="privacy">建議使用綽號，不要輸入真實姓名或可辨識的公司資訊。你寫的內容只存在這台裝置。</p>
+        {s.writeMood !== true && (
+          <div className="mood-choice" data-testid="mood-choice">
+            <p className="mood-q">要記錄下此刻的心情嗎？</p>
+            <p className="note">寫下來，最後積木人會照{t('{你}')}寫的話道歉；不想寫也沒關係，會用通用的台詞。</p>
+            <div className="mood-btns">
+              <button type="button" className="btn primary big" onClick={() => updateSession({ writeMood: true })} data-testid="mood-yes">
+                要，寫下來
+              </button>
+              <button
+                type="button"
+                className="btn big"
+                onClick={() => {
+                  updateSession({ writeMood: false });
+                  dispatch('SUBMIT_WANTED');
+                }}
+                data-testid="mood-skip"
+              >
+                跳過，直接開始
+              </button>
+            </div>
+          </div>
+        )}
+        {s.writeMood === true && (
+        <>
+        <p className="privacy">建議使用綽號，不要輸入真實姓名或可辨識的公司資訊。你寫的內容只存在這台裝置。每一題都可以不填。</p>
 
         <div className="row2">
           <Segmented<SelfPronoun>
@@ -63,7 +86,7 @@ export function WantedScreen() {
         </div>
 
         <section className="q">
-          <h3>A．{t('{你}')}為什麼想打爆這個人？<span className="req">必填</span></h3>
+          <h3>A．{t('{你}')}為什麼想打爆這個人？<span className="opt">選填</span></h3>
           <CharField
             ariaLabel="A．為什麼想打爆這個人"
             value={s.a}
@@ -168,18 +191,12 @@ export function WantedScreen() {
         <SaveContent />
 
         <div className="actions">
-          {!valid && <p className="why" id="why-disabled">先寫下 A．{t('{你}')}為什麼想打爆這個人，才能繼續。</p>}
-          <button
-            type="button"
-            className="btn primary big"
-            disabled={!valid}
-            aria-describedby={valid ? undefined : 'why-disabled'}
-            onClick={() => dispatch('SUBMIT_WANTED')}
-            data-testid="go-paint"
-          >
+          <button type="button" className="btn primary big" onClick={() => dispatch('SUBMIT_WANTED')} data-testid="go-paint">
             去畫那個爛人
           </button>
         </div>
+        </>
+        )}
       </form>
     </main>
   );

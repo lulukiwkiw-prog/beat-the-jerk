@@ -12,6 +12,7 @@ export function watchConsole(page: Page) {
 
 export async function fillWanted(page: Page, a = '明明是他沒做事，卻當眾怪我。') {
   await page.goto('/');
+  await page.getByTestId('mood-yes').click();
   await page.getByTestId('field-a').fill(a);
   await page.getByTestId('go-paint').click();
   await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
@@ -52,6 +53,7 @@ export interface BattleDebug {
   bucket: boolean;
   accordion: boolean;
   clockLength: number;
+  lastMove: string | null;
   events: string[];
   padHits: number;
   difficulty: string;
@@ -112,6 +114,7 @@ export async function throughApology(page: Page) {
 /** 從通緝單一路到開打（round 秒） */
 export async function quickBattle(page: Page, round: number, fill?: (p: Page) => Promise<void>) {
   await page.goto(`/?round=${round}`);
+  await page.getByTestId('mood-yes').click();
   await page.getByTestId('field-a').fill('明明是他沒做事，卻當眾怪我。');
   if (fill) await fill(page);
   await page.getByTestId('go-paint').click();

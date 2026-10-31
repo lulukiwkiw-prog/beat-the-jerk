@@ -48,3 +48,13 @@ export const APOLOGY_SPOT = {
   poolRadius: 2.4,
   poolOpacity: 0.55,
 } as const;
+
+/** 通緝單沒填時，道歉稿用的通用台詞（{你}／{他} 會依稱謂替換） */
+export const APOLOGY_DEFAULTS = {
+  /** 沒寫 A：開頭 */
+  opening: ['那件讓{你}難受的事，', '是我做得不對。'],
+  /** 沒選心情 */
+  feeling: ['我知道，那讓{你}很不好受。'],
+  /** 沒寫想聽的話 */
+  closing: ['這不是{你}的錯。', '{你}值得被好好對待。'],
+} as const;

@@ -1,5 +1,6 @@
 import type { OtherPronoun, SelfPronoun } from '../../state/text';
 import { fillPronouns } from '../../state/text';
+import { APOLOGY_DEFAULTS } from '../../config/dialogue.config';
 
 export interface ApologyInput {
   self: SelfPronoun;
@@ -17,18 +18,19 @@ export function joinFeelings(list: string[]): string {
 
 /**
  * 道歉稿（SPEC 第 14 節）：逐段淡入用的段落。玩家原文不改寫；
- * 未填的心情、想聽的話整段略過，不出現變數名稱、空引號或多餘空行。
+ * 沒填的題目改用通用台詞（APOLOGY_DEFAULTS），不出現變數名稱、空引號或多餘空行。
  */
 export function buildApology(i: ApologyInput): string[][] {
   const t = (s: string) => fillPronouns(s, i.self, i.other);
   const paras: string[][] = [];
+  // 沒填的題目改用通用台詞，任何組合讀起來都要通順
   const a = i.a.trim();
-  if (a) paras.push([t('關於{你}寫下的這件事：'), `「${a}」`]);
+  paras.push(a ? [t('關於{你}寫下的這件事：'), `「${a}」`] : APOLOGY_DEFAULTS.opening.map(t));
   const feelings = i.feelings.map((x) => x.trim()).filter(Boolean);
-  if (feelings.length) paras.push([t(`原來這件事，讓{你}感到${joinFeelings(feelings)}。`)]);
+  paras.push(feelings.length ? [t(`原來這件事，讓{你}感到${joinFeelings(feelings)}。`)] : APOLOGY_DEFAULTS.feeling.map(t));
   paras.push([t('我不應該那樣對{你}。'), '我錯了，對不起。']);
   const d = i.d.map((x) => x.trim()).filter(Boolean);
-  if (d.length) paras.push(d);
+  paras.push(d.length ? d : APOLOGY_DEFAULTS.closing.map(t));
   paras.push([t('原不原諒，由{你}決定。'), t('{你}不需要現在回答。')]);
   return paras;
 }

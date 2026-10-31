@@ -88,6 +88,7 @@ test('裝置不支援 WebGL 時顯示說明文字', async ({ page }) => {
     };
   });
   await page.goto('/');
+  await page.getByTestId('mood-yes').click();
   await page.getByTestId('field-a').fill('測試');
   await page.getByTestId('go-paint').click();
   await expect(page.getByText('這台裝置無法顯示 3D 畫面')).toBeVisible();

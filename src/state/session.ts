@@ -13,6 +13,8 @@ export interface Session {
   feelings: string[];
   customFeelings: string[];
   d: DLine[];
+  /** 要不要記錄此刻的心情：null＝還沒選、true＝展開填寫、false＝跳過 */
+  writeMood: boolean | null;
   /** null＝還沒選；skipped＝勾選略過 */
   angerBefore: number | null;
   angerSkipped: boolean;
@@ -38,6 +40,7 @@ export function emptySession(): Session {
     angerBefore: null,
     angerSkipped: false,
     angerAfter: null,
+    writeMood: null,
     rematchStreak: 0,
     restPromptShown: false,
   };
@@ -57,10 +60,6 @@ export function updateSession(patch: Partial<Session> | ((s: Session) => Partial
 
 export function filledD(s: Session): string[] {
   return s.d.map((l) => l.text.trim()).filter(Boolean);
-}
-
-export function isWantedValid(s: Session): boolean {
-  return s.a.trim() !== '';
 }
 
 /** 依目前稱謂填入 {你}／{他}。 */

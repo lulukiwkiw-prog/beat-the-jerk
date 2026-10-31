@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptySession, filledD, isWantedValid } from '../../src/state/session';
+import { emptySession, filledD } from '../../src/state/session';
 
 describe('通緝單資料', () => {
   it('沒有 B 欄；D 預設 1 欄、稱謂你／他', () => {
@@ -8,9 +8,10 @@ describe('通緝單資料', () => {
     expect(s.d).toHaveLength(1);
     expect([s.self, s.other]).toEqual(['你', '他']);
   });
-  it('A 只有空白時不合法', () => {
-    expect(isWantedValid({ ...emptySession(), a: '   ' })).toBe(false);
-    expect(isWantedValid({ ...emptySession(), a: '他' })).toBe(true);
+  it('一開始還沒選要不要記錄心情；每一題都可以不填', () => {
+    const s = emptySession();
+    expect(s.writeMood).toBeNull();
+    expect(s.a).toBe('');
   });
   it('D 忽略空白欄', () => {
     const s = emptySession();

@@ -75,6 +75,25 @@ export function PaintScreen() {
           ← 回通緝單
         </button>
         <h1>木偶彩繪室</h1>
+        {/* 常用的兩顆放在右上角，方便直接點 */}
+        <div className="head-actions">
+          <button
+            type="button"
+            className="btn"
+            disabled={finishing}
+            data-testid="random-look"
+            onClick={() => {
+              const names = paint.randomize();
+              ctrl.current?.faceFront();
+              setStatus(`隨機造型：${names.join('＋')}`);
+            }}
+          >
+            🎲 隨機造型
+          </button>
+          <button type="button" className="btn primary" onClick={finish} disabled={finishing} data-testid="go-duel">
+            出來決鬥！
+          </button>
+        </div>
       </header>
 
       <div className="paint-layout">
@@ -140,21 +159,6 @@ export function PaintScreen() {
                 />
               ))}
             </div>
-            <div className="btn-row">
-              <button
-                type="button"
-                className="btn"
-                disabled={finishing}
-                data-testid="random-look"
-                onClick={() => {
-                  const names = paint.randomize();
-                  ctrl.current?.faceFront();
-                  setStatus(`隨機造型：${names.join('＋')}`);
-                }}
-              >
-                🎲 一鍵隨機造型
-              </button>
-            </div>
             {acc[lookKind] && (
               <button type="button" className="btn small" onClick={() => paint.removeAccessory(lookKind)} disabled={finishing}>
                 拿掉立體配件
@@ -209,10 +213,7 @@ export function PaintScreen() {
               </div>
             )}
           </div>
-          <button type="button" className="btn primary big" onClick={finish} disabled={finishing} data-testid="go-duel">
-            就是你！出來決鬥！
-          </button>
-          <p className="note">不畫也可以直接出發。轉向按鈕可以畫側面和背面。</p>
+          <p className="note">不畫也可以直接按右上角「出來決鬥！」。轉向按鈕可以畫側面和背面。</p>
         </section>
       </div>
     </main>
