@@ -1,3 +1,5 @@
+import { AUDIO } from '../config/audio.config';
+import { readJSON, writeJSON } from '../storage/safeStorage';
 import { createStore, useStore } from './store';
 
 export type Level3 = 'off' | 'weak' | 'strong';
@@ -8,6 +10,13 @@ export interface Settings {
   flash: Level3;
   vibration: boolean;
   quality: QualityMode;
+  /** 音效、音樂：各自開關與音量（0～1） */
+  sfxOn: boolean;
+  sfxVolume: number;
+  musicOn: boolean;
+  musicVolume: number;
+  /** 漫畫鼻血（預設關） */
+  nosebleed: boolean;
 }
 
 export const prefersReducedMotion = (): boolean => {
@@ -28,10 +37,29 @@ export function defaultSettings(reduced = prefersReducedMotion()): Settings {
     flash: reduced ? 'off' : 'weak',
     vibration: true,
     quality: 'auto',
+    sfxOn: true,
+    sfxVolume: AUDIO.defaultSfx,
+    musicOn: true,
+    musicVolume: AUDIO.defaultMusic,
+    nosebleed: false,
   };
 }
 
-export const settingsStore = createStore<Settings>(defaultSettings());
+/** 設定記在這台裝置（不含任何玩家寫的內容）；讀不到或壞掉時用預設值。 */
+export const SETTINGS_KEY = 'btj.settings';
+function loadSettings(): Settings {
+  const d = defaultSettings();
+  const saved = readJSON<Partial<Settings>>(SETTINGS_KEY);
+  if (!saved || typeof saved !== 'object') return d;
+  const out = { ...d };
+  for (const k of Object.keys(d) as (keyof Settings)[]) {
+    if (typeof saved[k] === typeof d[k]) (out as Record<string, unknown>)[k] = saved[k];
+  }
+  return out;
+}
+
+export const settingsStore = createStore<Settings>(loadSettings());
+settingsStore.subscribe(() => writeJSON(SETTINGS_KEY, settingsStore.get()));
 export const useSettings = () => useStore(settingsStore);
 export const updateSettings = (patch: Partial<Settings>) => settingsStore.set((s) => ({ ...s, ...patch }));
 

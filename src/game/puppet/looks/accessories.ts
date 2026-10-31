@@ -13,9 +13,14 @@ import { DESIGN_SIZES, PART_DEFS, type FixedPartId, type PaintPartId } from '../
 export type AccessoryId =
   | 'pigHead' | 'teruteru' | 'chickenHead' | 'dinoHead'
   | 'longHair' | 'shortHair' | 'ponytail' | 'swoop' | 'slick' | 'buzz' | 'perm' | 'afro'
-  | 'chickenSuit' | 'longDress' | 'shortDress' | 'pigBody' | 'dinoSuit';
+  | 'chickenSuit' | 'longDress' | 'shortDress' | 'pigBody' | 'dinoSuit'
+  | 'roundGlasses' | 'sunglasses' | 'partyGlasses'
+  | 'redTie' | 'bowTie' | 'stripeTie'
+  | 'topHat' | 'cap' | 'partyHat';
 
-export type AccessorySlot = 'face' | 'hair' | 'costume';
+export type AccessorySlot = 'face' | 'hair' | 'costume' | 'glasses' | 'tie' | 'hat';
+/** 每一類最多戴一個 */
+export const ACCESSORY_SLOTS: AccessorySlot[] = ['face', 'hair', 'costume', 'glasses', 'tie', 'hat'];
 export type AttachPart = PaintPartId | FixedPartId;
 
 export interface Attachment {
@@ -175,7 +180,83 @@ function claws(color: string, n: number, spread: number, y: number, z: number, l
 }
 
 
+/** 眼睛高度（頭部設計座標）、鏡框 */
+const EYE_Y = 0.06;
+function frameRing(r: number, color: string, x: number) {
+  const m = new Mesh(geo(`ring${r}`, () => new TorusGeometry(r, 0.035, 10, 28)), plastic(color));
+  m.position.set(x, EYE_Y, HEAD.front + 0.05);
+  m.castShadow = true;
+  return m;
+}
+/** 眼鏡腳：從鏡框兩側往後到耳朵 */
+const temples = (color: string, y = EYE_Y) => [-1, 1].map((sx) => box(0.05, 0.05, 0.62, 0.02, color, sx * 0.6, y, HEAD.front - 0.26));
+/** 領帶從領口往下（軀幹設計座標） */
+const TIE_TOP = TORSO.top - 0.06;
+function tieBody(color: string, stripes?: string) {
+  const knot = box(0.2, 0.16, 0.08, 0.04, color, 0, TIE_TOP - 0.06, TORSO.front + 0.04);
+  const blade = box(0.24, 0.92, 0.04, 0.03, color, 0, TIE_TOP - 0.62, TORSO.front + 0.03);
+  const tip = cone(0.17, 0.22, color, 0, TIE_TOP - 1.16, TORSO.front + 0.03, [Math.PI, Math.PI / 4, 0]);
+  tip.scale.set(1, 1, 0.25);
+  const parts: Object3D[] = [knot, blade, tip];
+  if (stripes) for (let i = 0; i < 4; i++) parts.push(box(0.25, 0.06, 0.045, 0.01, stripes, 0, TIE_TOP - 0.32 - i * 0.2, TORSO.front + 0.035, [0, 0, 0.5]));
+  return group(...parts);
+}
+
 const BUILDERS: Record<AccessoryId, () => Attachment[]> = {
+  roundGlasses: () => {
+    const C = '#2B2B33';
+    const bridge = box(0.14, 0.04, 0.04, 0.015, C, 0, EYE_Y + 0.04, HEAD.front + 0.05);
+    return [{ part: 'head', object: group(frameRing(0.17, C, -0.23), frameRing(0.17, C, 0.23), bridge, ...temples(C)) }];
+  },
+  sunglasses: () => {
+    const lens = (x: number) => box(0.36, 0.22, 0.05, 0.08, '#1A1A22', x, EYE_Y, HEAD.front + 0.05);
+    const bar = box(0.86, 0.06, 0.05, 0.02, '#1A1A22', 0, EYE_Y + 0.1, HEAD.front + 0.05);
+    const shine = box(0.1, 0.04, 0.01, 0.01, '#9FB4D0', -0.3, EYE_Y + 0.05, HEAD.front + 0.08, [0, 0, 0.6]);
+    return [{ part: 'head', object: group(lens(-0.22), lens(0.22), bar, shine, ...temples('#1A1A22')) }];
+  },
+  partyGlasses: () => {
+    // 派對大眼鏡：粉紅寬框、黃色鏡片，上面兩顆小星星
+    const frame = (x: number) => group(box(0.42, 0.32, 0.05, 0.1, '#FF5FA2', x, EYE_Y, HEAD.front + 0.05), box(0.3, 0.2, 0.02, 0.06, '#FFE680', x, EYE_Y, HEAD.front + 0.085));
+    const stars = [-1, 1].map((sx) => cone(0.08, 0.18, '#FFC63A', sx * 0.38, EYE_Y + 0.3, HEAD.front + 0.06));
+    return [{ part: 'head', object: group(frame(-0.24), frame(0.24), ...stars, ...temples('#FF5FA2')) }];
+  },
+  redTie: () => [{ part: 'torso', object: tieBody('#D8322A') }],
+  stripeTie: () => [{ part: 'torso', object: tieBody('#2F5DA8', '#FFC63A') }],
+  bowTie: () => {
+    const C = '#7E3FB2';
+    const wing = (sx: number) => {
+      const c = cone(0.17, 0.32, C, sx * 0.17, TIE_TOP - 0.1, TORSO.front + 0.06, [0, 0, sx * Math.PI / 2]);
+      c.scale.set(1, 1, 0.45);
+      return c;
+    };
+    const knot = ball(0.08, '#5E2A8A', 0, TIE_TOP - 0.1, TORSO.front + 0.08);
+    return [{ part: 'torso', object: group(wing(-1), wing(1), knot) }];
+  },
+  topHat: () => {
+    const brim = new Mesh(geo('hatBrim', () => new CylinderGeometry(0.8, 0.8, 0.06, 32)), plastic('#1E1E24'));
+    brim.position.y = HEAD.top + 0.05;
+    const crown = new Mesh(geo('hatCrown', () => new CylinderGeometry(0.5, 0.52, 0.72, 32)), plastic('#1E1E24'));
+    crown.position.y = HEAD.top + 0.42;
+    const band = new Mesh(geo('hatBand', () => new CylinderGeometry(0.53, 0.53, 0.12, 32)), plastic('#D8322A'));
+    band.position.y = HEAD.top + 0.15;
+    return [{ part: 'head', object: group(brim, crown, band) }];
+  },
+  cap: () => {
+    const dome = new Mesh(geo('capDome', () => new SphereGeometry(0.66, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2)), plastic('#2F8F5B'));
+    dome.position.y = HEAD.top - 0.04;
+    dome.scale.set(1, 0.62, 1);
+    const bill = box(0.9, 0.05, 0.5, 0.04, '#2F8F5B', 0, HEAD.top, HEAD.front + 0.18);
+    const button = ball(0.07, '#FFFFFF', 0, HEAD.top + 0.38, 0);
+    return [{ part: 'head', object: group(dome, bill, button) }];
+  },
+  partyHat: () => {
+    const body = new Mesh(geo('partyCone', () => new ConeGeometry(0.36, 0.9, 24)), plastic('#4FB3FF'));
+    body.position.set(0.1, HEAD.top + 0.45, 0);
+    body.rotation.z = -0.15;
+    const dots = [0.25, 0.5].map((y, i) => ball(0.06, i ? '#FF5FA2' : '#FFC63A', 0.1 - y * 0.12 + 0.02, HEAD.top + y, 0.3 - y * 0.25));
+    const pom = ball(0.11, '#FFC63A', 0.24, HEAD.top + 0.92, 0);
+    return [{ part: 'head', object: group(body, ...dots, pom) }];
+  },
   pigHead: () => {
     const PINK = '#EE8FA6';
     // 大豬鼻：朝前的圓柱＋兩個鼻孔

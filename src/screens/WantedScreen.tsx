@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FORM } from '../config/form.config';
 import { dispatch } from '../state/app';
+import { SaveContent } from '../ui/SaveContent';
 import { isWantedValid, newId, updateSession, useSession } from '../state/session';
 import { fillPronouns, type OtherPronoun, type SelfPronoun } from '../state/text';
 import { CharField } from '../ui/CharField';
@@ -163,6 +164,8 @@ export function WantedScreen() {
             <span>10 氣炸</span>
           </div>
         </section>
+
+        <SaveContent />
 
         <div className="actions">
           {!valid && <p className="why" id="why-disabled">先寫下 A．{t('{你}')}為什麼想打爆這個人，才能繼續。</p>}

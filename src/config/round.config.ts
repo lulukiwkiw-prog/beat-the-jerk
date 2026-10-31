@@ -92,3 +92,21 @@ export const KNOCKDOWN = {
   invulnerable: 1.5,
   push: 9,
 } as const;
+
+/**
+ * 小型活動（SPEC 第 13 節，依一回合 1 分鐘調整）：每一分鐘的第 15～40 秒是狂熱時間；
+ * 鞋子時間、彈墊時間各有一定機率出現，一個在狂熱前、一個在狂熱中後段（每分鐘各最多一次）。
+ * 時間都以「這一分鐘內第幾秒」計算；剩 15 秒（第 45 秒）會問致命一擊。
+ */
+export const EVENTS = {
+  fever: { from: 15, to: 40 },
+  shoe: { duration: 10, cooldown: 0.3 },
+  bounce: { duration: 15, bonus: 10, restitution: 1.05, hitGap: 0.4 },
+  /** 每分鐘各自出現的機率 */
+  chance: 0.75,
+  /** 前段、後段的開始時間範圍 */
+  earlySlot: [2, 6],
+  lateSlot: [26, 30],
+  /** 狂熱時間：粒子、文字放大倍率 */
+  feverFx: 1.5,
+} as const;

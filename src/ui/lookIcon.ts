@@ -24,11 +24,12 @@ const LAYOUT: Record<string, [number, number, number, number]> = {
   shoeL: [-SK.hipX, torsoBase + SK.kneeY + SK.shoe.y, 0.74, 0.28],
   shoeR: [SK.hipX, torsoBase + SK.kneeY + SK.shoe.y, 0.74, 0.28],
 };
-const HEAD_ACC: AccessoryId[] = ['pigHead', 'teruteru', 'chickenHead', 'dinoHead', 'longHair', 'shortHair', 'ponytail', 'swoop', 'slick', 'buzz', 'perm', 'afro'];
+const HEAD_ACC: AccessoryId[] = ['pigHead', 'teruteru', 'chickenHead', 'dinoHead', 'longHair', 'shortHair', 'ponytail', 'swoop', 'slick', 'buzz', 'perm', 'afro', 'roundGlasses', 'sunglasses', 'partyGlasses', 'topHat', 'cap', 'partyHat'];
 
 type View = { cx: number; cy: number; span: number };
-const VIEWS: Record<'head' | 'body', View> = {
+const VIEWS: Record<'head' | 'body' | 'hat', View> = {
   head: { cx: 0, cy: LAYOUT.head[1] + 0.12, span: 2.3 },
+  hat: { cx: 0, cy: LAYOUT.head[1] + 0.45, span: 2.6 },
   body: { cx: 0, cy: 2.35, span: 5.2 },
 };
 
@@ -65,7 +66,59 @@ function overlayDesign(c: CanvasRenderingContext2D, id: AccessoryId) {
     c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
     c.fill();
   };
+  const ey = 4.21;
+  const tie = 3.59;
   switch (id) {
+    case 'roundGlasses':
+      c.strokeStyle = '#2B2B33';
+      c.lineWidth = 0.06;
+      for (const x of [-0.23, 0.23]) {
+        c.beginPath();
+        c.arc(x, ey, 0.17, 0, Math.PI * 2);
+        c.stroke();
+      }
+      r('#2B2B33', 0, ey + 0.04, 0.14, 0.04);
+      break;
+    case 'sunglasses':
+      r('#1A1A22', -0.22, ey, 0.36, 0.22);
+      r('#1A1A22', 0.22, ey, 0.36, 0.22);
+      r('#1A1A22', 0, ey + 0.1, 0.86, 0.06);
+      break;
+    case 'partyGlasses':
+      for (const x of [-0.24, 0.24]) {
+        r('#FF5FA2', x, ey, 0.42, 0.32);
+        r('#FFE680', x, ey, 0.3, 0.2);
+      }
+      poly('#FFC63A', [[-0.46, ey + 0.2], [-0.3, ey + 0.2], [-0.38, ey + 0.42]]);
+      poly('#FFC63A', [[0.3, ey + 0.2], [0.46, ey + 0.2], [0.38, ey + 0.42]]);
+      break;
+    case 'redTie':
+    case 'stripeTie': {
+      const col = id === 'redTie' ? '#D8322A' : '#2F5DA8';
+      r(col, 0, tie - 0.06, 0.2, 0.16);
+      poly(col, [[-0.12, tie - 0.14], [0.12, tie - 0.14], [0.17, tie - 1.05], [0, tie - 1.27], [-0.17, tie - 1.05]]);
+      if (id === 'stripeTie') for (let i = 0; i < 4; i++) r('#FFC63A', 0, tie - 0.32 - i * 0.2, 0.26, 0.05);
+      break;
+    }
+    case 'bowTie':
+      poly('#7E3FB2', [[0, tie - 0.1], [-0.34, tie + 0.06], [-0.34, tie - 0.26]]);
+      poly('#7E3FB2', [[0, tie - 0.1], [0.34, tie + 0.06], [0.34, tie - 0.26]]);
+      e('#5E2A8A', 0, tie - 0.1, 0.08, 0.08);
+      break;
+    case 'topHat':
+      r('#1E1E24', 0, top + 0.05, 1.6, 0.07);
+      r('#1E1E24', 0, top + 0.42, 1.0, 0.72);
+      r('#D8322A', 0, top + 0.15, 1.04, 0.12);
+      break;
+    case 'cap':
+      e('#2F8F5B', 0, top - 0.04, 0.66, 0.42);
+      r('#2F8F5B', 0, top - 0.02, 0.9, 0.08);
+      e('#FFFFFF', 0, top + 0.36, 0.07, 0.07);
+      break;
+    case 'partyHat':
+      poly('#4FB3FF', [[-0.26, top], [0.46, top], [0.24, top + 0.9]]);
+      e('#FFC63A', 0.24, top + 0.92, 0.11, 0.11);
+      break;
     case 'pigHead':
       poly('#EE8FA6', [[-0.7, top - 0.05], [-0.3, top + 0.05], [-0.62, top + 0.4]]);
       poly('#EE8FA6', [[0.7, top - 0.05], [0.3, top + 0.05], [0.62, top + 0.4]]);
@@ -175,7 +228,7 @@ function overlayDesign(c: CanvasRenderingContext2D, id: AccessoryId) {
 export function drawLookIcon(cv: HTMLCanvasElement, look: LookPreset) {
   const c = cv.getContext('2d');
   if (!c) return;
-  const v = VIEWS[look.kind === 'costume' ? 'body' : 'head'];
+  const v = VIEWS[look.kind === 'costume' || look.kind === 'tie' ? 'body' : look.kind === 'hat' ? 'hat' : 'head'];
   const s = cv.width / v.span;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.clearRect(0, 0, cv.width, cv.height);

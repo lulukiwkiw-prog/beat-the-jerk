@@ -474,3 +474,33 @@ kbd { font-family: var(--font-num); font-size: 12px; border: 1.5px solid var(--l
 @media (prefers-reduced-motion: reduce) {
   .combo-pop, .combo-pop[data-tier='3'] { animation: none; }
 }
+.sound-row { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.sound-row input[type='range'] { flex: 1; min-width: 120px; accent-color: var(--tomato); margin-bottom: 10px; }
+
+/* ---------- 小型活動 ---------- */
+.chip-event { align-self: center; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 900; color: #fff; background: var(--ink); white-space: nowrap; }
+.chip-event.fever { background: linear-gradient(90deg, #FF5FA2, #FFC63A); color: var(--ink); animation: fever-chip 0.6s ease-in-out infinite alternate; }
+.chip-event.shoe { background: #8B5A2B; }
+.chip-event.bounce { background: #FF7FA8; color: var(--ink); }
+@keyframes fever-chip { to { transform: scale(1.08); } }
+.battle-stage.fever { box-shadow: 0 0 0 3px #FF5FA2, 0 0 22px 4px rgba(255, 95, 162, 0.55); animation: fever-glow 0.5s ease-in-out infinite alternate; }
+@keyframes fever-glow { to { box-shadow: 0 0 0 3px #FFC63A, 0 0 28px 6px rgba(255, 198, 58, 0.6); } }
+@media (prefers-reduced-motion: reduce) {
+  .chip-event.fever, .battle-stage.fever { animation: none; }
+}
+
+/* ---------- 儲存 ---------- */
+.saved-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.saved-list li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.saved-name { flex: 1; font-weight: 700; min-width: 90px; }
+.saved-name small { margin-left: 6px; color: var(--muted); font-weight: 400; }
+.btn.danger { background: var(--tomato); color: #fff; border-color: var(--tomato); }
+.consent { border: 2px dashed var(--ink); border-radius: 12px; padding: 10px 12px; background: var(--card); }
+.consent ul { margin: 4px 0 8px; padding-left: 20px; }
+.clear-data { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+/* 範例類別有 6 個：不夠寬時換行成兩排，字不會被擠成直的 */
+.seg[aria-label='範例類別'] { display: inline-grid; grid-template-columns: repeat(6, auto); max-width: 100%; }
+.seg[aria-label='範例類別'] .seg-btn { white-space: nowrap; padding: 5px 12px; }
+@media (max-width: 1100px) {
+  .seg[aria-label='範例類別'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

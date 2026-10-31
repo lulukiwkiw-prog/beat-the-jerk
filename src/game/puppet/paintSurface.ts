@@ -4,7 +4,8 @@ import { PUPPET } from '../../config/puppet.config';
 import { History } from './history';
 import { DESIGN_SIZES, PAINT_PARTS, PART_DEFS, partFaceDims, type PaintPartId } from './parts';
 import { atlasHeight, atlasWidth, cellOrigin, DEFAULT_LAYOUT, faceDims, FACES, type Face, type FacePoint } from './faces';
-import type { AccessoryId, AccessorySlot } from './looks/accessories';
+import { ACCESSORY_IDS, ACCESSORY_SLOTS, type AccessoryId, type AccessorySlot } from './looks/accessories';
+import type { SavedLookData } from '../../storage/saves';
 import { lookById, looksOf, type LookPreset } from './looks/presets';
 
 export interface Surface {
@@ -37,7 +38,7 @@ export class PaintStore {
   readonly surfaces: Record<PaintPartId, Surface>;
   readonly history: History<HistKey, HistData>;
   /** 3D 凸出配件：每一類最多一個 */
-  accessories: AccessoryState = { face: null, hair: null, costume: null };
+  accessories: AccessoryState = { face: null, hair: null, costume: null, glasses: null, tie: null, hat: null };
   private accListeners = new Set<() => void>();
   /** 曾被畫過的面（清空時只需記錄這些） */
   private touched = new Set<FaceKey>();
@@ -222,7 +223,7 @@ export class PaintStore {
   randomize(rand: () => number = Math.random) {
     const pick = <T,>(list: T[]) => list[Math.floor(rand() * list.length)];
     const chosen = (['face', 'hair', 'costume'] as const).map((k) => pick(looksOf(k)));
-    const keys = new Set<HistKey>([...this.touched, 'acc:face', 'acc:hair', 'acc:costume']);
+    const keys = new Set<HistKey>([...this.touched, ...ACCESSORY_SLOTS.map((sl) => `acc:${sl}` as const)]);
     for (const l of chosen) for (const k of this.lookKeys(l)) keys.add(k);
     this.history.record([...keys]);
     this.resetCanvases();
@@ -238,7 +239,7 @@ export class PaintStore {
       s.ctx.fillRect(0, 0, s.canvas.width, s.canvas.height);
       this.markDirty(part);
     }
-    (['face', 'hair', 'costume'] as const).forEach((sl) => this.setAccessory(sl, null));
+    ACCESSORY_SLOTS.forEach((sl) => this.setAccessory(sl, null));
   }
 
   /** 拿掉某一類的 3D 配件（可復原）。 */
@@ -267,6 +268,47 @@ export class PaintStore {
     this.touched.clear();
     this.history.clear();
     this.emit();
+  }
+
+  /** 匯出目前外觀（各部位 PNG＋配件），供「儲存外觀」使用。沒畫過的部位不存。 */
+  exportLook(): SavedLookData {
+    const parts: SavedLookData['parts'] = {};
+    const painted = new Set([...this.touched].map((k) => this.parse(k)[0]));
+    for (const part of PAINT_PARTS) if (painted.has(part)) parts[part] = this.surfaces[part].canvas.toDataURL('image/png');
+    return { parts, accessories: { ...this.accessories } };
+  }
+
+  /** 套用儲存的外觀（整個換掉，算一步可復原）。圖片載入失敗回傳 false。 */
+  async importLook(data: SavedLookData): Promise<boolean> {
+    const images = new Map<PaintPartId, HTMLImageElement>();
+    try {
+      for (const part of PAINT_PARTS) {
+        const url = data.parts[part];
+        if (typeof url !== 'string' || !url.startsWith('data:image/png')) continue;
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        images.set(part, img);
+      }
+    } catch {
+      return false;
+    }
+    const keys = new Set<HistKey>([...this.touched, ...ACCESSORY_SLOTS.map((sl) => `acc:${sl}` as const)]);
+    for (const part of images.keys()) for (const f of [0, 1, 2, 3, 4, 5] as Face[]) keys.add(`${part}:${f}`);
+    this.history.record([...keys]);
+    this.resetCanvases();
+    for (const [part, img] of images) {
+      const s = this.surfaces[part];
+      s.ctx.drawImage(img, 0, 0, s.canvas.width, s.canvas.height);
+      for (const f of [0, 1, 2, 3, 4, 5] as Face[]) this.touched.add(`${part}:${f}`);
+      this.markDirty(part);
+    }
+    for (const sl of ACCESSORY_SLOTS) {
+      const id = data.accessories[sl];
+      this.setAccessory(sl, id && ACCESSORY_IDS.includes(id) ? id : null);
+    }
+    this.emit();
+    return true;
   }
 
   /** 是否已被畫過（不是全空白）。 */

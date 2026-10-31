@@ -17,10 +17,13 @@ import { openSettings, useSettingsOpen } from '../ui/SettingsPanel';
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 const INITIAL: HudState = {
-  phase: 'countdown', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false, cine: '',
+  phase: 'countdown', timeLeft: 0, score: 0, combo: 0, maxCombo: 0, kind: 'hand', cooldowns: {}, countdown: '3', paused: false, cine: '', events: [],
 };
 
 /** 步驟 2～結尾：決鬥、道歉、結尾都在同一個 3D 擂台場景裡 */
+/** 進行中的小型活動標籤 */
+const EVENT_LABEL: Record<string, string> = { fever: '狂熱中', shoe: '鞋子時間', bounce: '彈墊時間' };
+
 /** 可以暫停、提前結束的階段 */
 const LIVE_PHASES: HudState['phase'][] = ['countdown', 'fight'];
 
@@ -138,7 +141,7 @@ export function BattleScreen() {
   return (
     <main className={`screen battle-screen ${inStory ? 'story-mode' : ''}`}>
       <div className="battle-wrap">
-        <div className="battle-stage" data-testid="battle-stage">
+        <div className={`battle-stage ${hud.events.includes('fever') ? 'fever' : ''}`} data-testid="battle-stage">
           <div className="battle-gl" ref={stageRef}>
             {!gl && <NoWebGL />}
           </div>
@@ -177,6 +180,11 @@ export function BattleScreen() {
               <div className="chip-stat">分數<b data-testid="hud-score">{hud.score}</b></div>
               <div className="chip-stat">連擊<b data-testid="hud-combo">{hud.combo}</b></div>
               <div className="chip-stat">最高<b>{hud.maxCombo}</b></div>
+              {hud.events.map((e) => (
+                <div key={e} className={`chip-event ${e}`} data-testid={`event-${e}`}>
+                  {EVENT_LABEL[e]}
+                </div>
+              ))}
             </div>
             <div className="hud-right">
               <button type="button" className="icon-btn" aria-label="暫停" onClick={() => dispatch('PAUSE')} disabled={!LIVE_PHASES.includes(hud.phase)} data-testid="pause">

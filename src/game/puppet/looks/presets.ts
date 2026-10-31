@@ -5,7 +5,7 @@ import {
   all, blush, dot, ellipse, eyeWhite, fill, fillBottom, fillTop, INK, lashes, rect, stroke, WHITE, type Draw,
 } from './draw';
 
-export type LookKind = 'face' | 'hair' | 'costume';
+export type LookKind = 'face' | 'hair' | 'costume' | 'glasses' | 'tie' | 'hat';
 export type PaintPlan = Partial<Record<PaintPartId, Partial<Record<Face, Draw>>>>;
 
 export interface LookPreset {
@@ -422,12 +422,25 @@ export const LOOKS: LookPreset[] = [
     accessory: 'pigBody',
   },
   { id: 'dinoSuit', kind: 'costume', label: '恐龍裝', paint: body({ torso: DINO, arms: DINO, legs: DINO }, bellyPaint('#F7E27A', '#D9B93A')), accessory: 'dinoSuit' },
+  // 配件：只放 3D 配件，不畫進彩繪
+  { id: 'roundGlasses', kind: 'glasses', label: '圓框眼鏡', paint: {}, accessory: 'roundGlasses' },
+  { id: 'sunglasses', kind: 'glasses', label: '墨鏡', paint: {}, accessory: 'sunglasses' },
+  { id: 'partyGlasses', kind: 'glasses', label: '派對眼鏡', paint: {}, accessory: 'partyGlasses' },
+  { id: 'redTie', kind: 'tie', label: '紅領帶', paint: {}, accessory: 'redTie' },
+  { id: 'stripeTie', kind: 'tie', label: '條紋領帶', paint: {}, accessory: 'stripeTie' },
+  { id: 'bowTie', kind: 'tie', label: '蝴蝶結', paint: {}, accessory: 'bowTie' },
+  { id: 'topHat', kind: 'hat', label: '紳士帽', paint: {}, accessory: 'topHat' },
+  { id: 'cap', kind: 'hat', label: '棒球帽', paint: {}, accessory: 'cap' },
+  { id: 'partyHat', kind: 'hat', label: '派對帽', paint: {}, accessory: 'partyHat' },
 ];
 
 export const LOOK_KINDS: { kind: LookKind; label: string }[] = [
   { kind: 'face', label: '臉部' },
   { kind: 'hair', label: '髮型' },
   { kind: 'costume', label: '服裝' },
+  { kind: 'glasses', label: '眼鏡' },
+  { kind: 'tie', label: '領帶' },
+  { kind: 'hat', label: '帽子' },
 ];
 
 export const lookById = (id: string) => LOOKS.find((l) => l.id === id);

@@ -16,7 +16,7 @@ export const EFFECTS = {
   /** 粒子數：一般、重擊 */
   hitParticles: { star: [5, 9], chip: [7, 14] },
   /** 殘影：產生間隔（秒）、存活時間、不透明度、顏色 */
-  afterimage: { every: 0.028, life: 0.22, opacity: 0.55, color: '#7CC8FF' },
+  afterimage: { every: 0.028, life: 0.22, opacity: 0.55, color: '#7CC8FF', maxGhosts: 80 },
 } as const;
 
 /** 空中連擊：浮空的木偶打得到的高度（H）、每次命中往上托的速度、滯空時間與滯空時的重力比例、玩家跳起追打 */

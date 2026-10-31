@@ -8,6 +8,7 @@ import { webglSupported } from '../game/three/renderer';
 import { dispatch } from '../state/app';
 import { NoWebGL } from '../ui/NoWebGL';
 import { LookButton } from '../ui/LookButton';
+import { SavedLooks } from '../ui/SavedLooks';
 import { LOOK_KINDS, looksOf, type LookKind } from '../game/puppet/looks/presets';
 import { Segmented } from '../ui/Segmented';
 
@@ -175,6 +176,7 @@ export function PaintScreen() {
               {zoom && <span className="zoom-name">正在放大：{PART_DEFS[zoom].label}</span>}
             </div>
           </div>
+          <SavedLooks paint={paint} disabled={finishing} />
           <div className="tool-group">
             <span className="tool-label">編輯</span>
             <div className="btn-row">

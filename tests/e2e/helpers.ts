@@ -52,6 +52,8 @@ export interface BattleDebug {
   bucket: boolean;
   accordion: boolean;
   clockLength: number;
+  events: string[];
+  padHits: number;
   difficulty: string;
   puppetEvading: boolean;
   playerDown: boolean;

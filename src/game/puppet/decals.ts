@@ -1,6 +1,6 @@
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, type Object3D } from 'three';
 
-export type DecalKind = 'palm' | 'shoe' | 'silly';
+export type DecalKind = 'palm' | 'shoe' | 'silly' | 'nosebleed';
 
 function makeTex(draw: (c: CanvasRenderingContext2D) => void): CanvasTexture {
   const cv = document.createElement('canvas');
@@ -39,6 +39,22 @@ function textures(): Record<DecalKind, CanvasTexture> {
       x.fill();
       x.fillStyle = 'rgba(255,255,255,.55)';
       for (let i = 0; i < 5; i++) x.fillRect(42, 22 + i * 10, 44, 3);
+    }),
+    // 漫畫鼻血：兩道往下流的紅線，末端圓滴
+    nosebleed: makeTex((x) => {
+      x.fillStyle = '#D9212C';
+      for (const cx of [50, 78]) {
+        x.beginPath();
+        x.moveTo(cx - 5, 10);
+        x.quadraticCurveTo(cx - 7, 60, cx - 3, 96);
+        x.lineTo(cx + 3, 96);
+        x.quadraticCurveTo(cx + 6, 60, cx + 5, 10);
+        x.closePath();
+        x.fill();
+        x.beginPath();
+        x.arc(cx, 100, 8, 0, Math.PI * 2);
+        x.fill();
+      }
     }),
     // 滑稽表情：挑眉＋吐舌（不使用任何文字）
     silly: makeTex((x) => {
@@ -91,7 +107,7 @@ export class DecalLayer {
       new MeshBasicMaterial({ map: textures()[kind], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
     );
     mesh.position.set((Math.random() - 0.5) * jitter[0], (Math.random() - 0.5) * jitter[1], frontZ + 0.012);
-    mesh.rotation.z = kind === 'silly' ? 0 : (Math.random() - 0.5) * 0.6;
+    mesh.rotation.z = kind === 'silly' || kind === 'nosebleed' ? 0 : (Math.random() - 0.5) * 0.6;
     mesh.renderOrder = 2;
     target.add(mesh);
     this.list.push({ mesh, life });

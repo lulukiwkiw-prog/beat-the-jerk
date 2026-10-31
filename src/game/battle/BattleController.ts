@@ -2,9 +2,12 @@ import { Color, Fog, Vector3, type Object3D } from 'three';
 import { CAMERA, GAME } from '../../config/game.config';
 import { EFFECTS, JUGGLE } from '../../config/effects.config';
 import { AfterImages } from '../effects/afterimage';
+import { audio, type SfxName } from '../../audio/engine';
 import { H, MOVE_SETS, MOVES, PLAYER, type DashMove, type MeleeMove, type MoveId, type MoveKind, type ThrowMove } from '../../config/moves.config';
 import { PUPPET } from '../../config/puppet.config';
-import { EASY_AI, FINISHER, HARD_AI, KNOCKDOWN, ROUND } from '../../config/round.config';
+import { EASY_AI, EVENTS, FINISHER, HARD_AI, KNOCKDOWN, ROUND } from '../../config/round.config';
+import { MiniEvents, type MiniEvent } from '../events/miniEvents';
+import { BouncePads } from '../effects/bouncePads';
 import { SCORING } from '../../config/scoring.config';
 import { HardAI } from '../enemy/hardAI';
 import type { Difficulty } from '../../state/battle';
@@ -39,6 +42,16 @@ import { SceneHost } from '../three/sceneHost';
 
 /** 各近戰招式命中點的高度（離木偶腳底） */
 const HIT_Y: Partial<Record<MoveId, number>> = { slap: 4.1, stomp: 1.4, hammer: 4.6, spin: 2.8, club: 3.8 };
+/** 小型活動開始時的提示（2 秒） */
+const EVENT_BANNER: Record<MiniEvent, string> = {
+  fever: '狂熱時間！特效全開',
+  shoe: '鞋子時間！丟鞋子不用等',
+  bounce: '彈墊時間！打到場邊彈回來 +10',
+};
+
+/** 各招命中音效（沒列的依輕重用一般打擊聲） */
+const HIT_SFX: Partial<Record<MoveId, SfxName>> = { slap: 'slap', stomp: 'stomp', bucket: 'clang', chair: 'crash', hammer: 'clang' };
+
 /** 浮空時打得到的高度：踩扁、鐵錘只能打地面上的 */
 const AIR_OK = (id: MoveId) => id !== 'stomp' && id !== 'hammer';
 const reachLift = (m: { id: MoveId; maxTargetLift: number }, airborne: boolean) =>
@@ -84,6 +97,8 @@ export interface HudState {
   cooldowns: Partial<Record<MoveId, number>>;
   countdown: string;
   paused: boolean;
+  /** 進行中的小型活動 */
+  events: MiniEvent[];
   /** 致命一擊演出的字幕：title＝開場標題、ko＝擊倒 */
   cine: '' | 'title' | 'ko';
 }
@@ -153,6 +168,15 @@ export class BattleController {
   private director: DialogueDirector;
   private bubble: DialogueBubble;
   private hits = 0;
+  /** 小型活動與彈墊 */
+  private events = new MiniEvents();
+  private fever = false;
+  private bounceOn = false;
+  private pads: BouncePads;
+  private lastPadHit = -1;
+  private padHits = 0;
+  /** 倒數嗶聲：上一次響的數字 */
+  private lastBeep = '';
   /** 命中停格剩餘秒數、殘影 */
   private hitStop = 0;
   private ghosts: AfterImages;
@@ -196,6 +220,7 @@ export class BattleController {
     this.words = new ComicWords(dom.fx);
     this.shoes = new Projectiles(this.host.scene);
     this.ghosts = new AfterImages(this.host.scene);
+    this.pads = new BouncePads(this.host.scene);
     this.input = new BattleInput(() => this.requestPause());
     this.clock = new RoundClock(roundLength);
     document.addEventListener('visibilitychange', this.onVis);
@@ -217,6 +242,13 @@ export class BattleController {
 
   /** 重新開始：重設分數、連擊、計時、角色、冷卻、投射物、粒子。 */
   restart() {
+    audio.setMusic('battle');
+    audio.setFever(false);
+    audio.setPaused(false);
+    this.lastBeep = '';
+    this.stopEvents();
+    this.events.reset();
+    this.padHits = 0;
     this.round++;
     this.seq = 0;
     this.ledger = new ScoreLedger();
@@ -273,6 +305,7 @@ export class BattleController {
   setPaused(p: boolean) {
     if (p === this.paused || this.phase === 'ended' || SHOW_PHASES.includes(this.phase)) return;
     this.paused = p;
+    audio.setPaused(p);
     if (p) {
       this.clock.pause();
       this.input.setEnabled(false);
@@ -324,14 +357,21 @@ export class BattleController {
     }
     this.handleDialogue(this.director.update(this.gameTime));
     if (this.phase === 'countdown') {
+      const n = String(Math.max(1, Math.ceil(ROUND.countdown - this.phaseTime - 0.4)));
+      if (n !== this.lastBeep) {
+        this.lastBeep = n;
+        audio.play('beep');
+      }
       if (this.phaseTime >= ROUND.countdown) {
         this.phase = 'fight';
         this.phaseTime = 0;
         this.clock.start();
         this.input.setEnabled(true);
         this.ev.onBanner('開打！');
+        audio.play('go');
       }
     } else if (this.phase === 'fight') {
+      this.updateEvents();
       // 剩 15 秒：問要不要給致命一擊（回合本身短於 15 秒的開發測試不問）
       const len = this.clock.lengthSec;
       if (len > ROUND.finisherAskAt && this.askedLen !== len && this.clock.remaining() <= ROUND.finisherAskAt) this.askFinisher();
@@ -400,6 +440,7 @@ export class BattleController {
         if (this.live && !p.airborne && !p.invulnerable) {
           p.evade(this.pendingEvade.dir, HARD_AI.dodgeTime, HARD_AI.dodgeSpeed);
           this.words.add('閃開！', p.x, 5.6, '#C9D2F2', 0.7);
+          audio.play('whoosh', 0.8);
         }
         this.pendingEvade = null;
       }
@@ -419,6 +460,7 @@ export class BattleController {
     if (this.difficulty === 'hard' && this.live && canAct && this.hardAi.move) p.vx = this.hardAi.move * HARD_AI.walkSpeed;
     for (const e of aiEvents) {
       if (e.type === 'windup') {
+        audio.play('alert');
         this.windupDist = Math.abs(pl.x - p.x);
         p.setAiPose('windup', e.side);
         this.dom.alert.hidden = false;
@@ -437,6 +479,7 @@ export class BattleController {
     this.ledger.tick(this.clock.elapsed());
     this.particles.update(dt);
     this.ghosts.update(dt);
+    this.pads.update(dt);
     this.words.update(dt);
     this.shake = Math.max(0, this.shake - dt * CAMERA.shakeDecay);
     this.flash = Math.max(0, this.flash - dt * EFFECTS.flashDecay);
@@ -476,6 +519,7 @@ export class BattleController {
   /** 招式開始時的提示（鐵錘蓄力） */
   private onAttackStart(att: ActiveAttack | null) {
     if (!att) return;
+    audio.play(att.move.type === 'throw' ? 'throw' : 'whoosh', att.move.id === 'hammer' ? 0.5 : 1);
     if (att.move.id === 'hammer') this.words.add('蓄力…', this.player.x, 5.7, '#FFC63A', 0.8);
     // 困難模式：木偶看到玩家出招，偶爾在判定前往後跳開（閃避後至少 3 秒不再閃）
     const p = this.puppet;
@@ -536,15 +580,24 @@ export class BattleController {
     const tier = big ? 1 : 0;
     this.hitStop = Math.max(this.hitStop, big ? E.hitStop.heavy : E.hitStop.light);
     p.hitFlash(E.hitFlash.time);
-    this.particles.burst(at, 'star', E.hitParticles.star[tier]);
-    this.particles.burst(at, 'chip', E.hitParticles.chip[tier]);
-    this.words.add(m.words[segment % m.words.length], at.x, at.y + 0.6, '#E8392B', big ? 1.25 : 1.05);
+    // 狂熱時間：特效升級
+    const fx = this.fever ? EVENTS.feverFx : 1;
+    this.particles.burst(at, 'star', Math.round(E.hitParticles.star[tier] * fx));
+    this.particles.burst(at, 'chip', Math.round(E.hitParticles.chip[tier] * fx));
+    this.words.add(m.words[segment % m.words.length], at.x, at.y + 0.6, this.fever ? '#FF5FA2' : '#E8392B', (big ? 1.25 : 1.05) * (this.fever ? 1.2 : 1));
     if (wasAir) this.words.add('空中！', at.x - dir * 1.2, at.y + 1.5, '#7FD3FF', 0.75);
     const comboBoost = Math.min(E.hitShake.maxCombo, res.combo * E.hitShake.perCombo);
     this.kick((big ? E.hitShake.heavy : E.hitShake.light) * (1 + comboBoost));
     this.showScore(res.lines, at);
+    audio.play(HIT_SFX[id] ?? (big ? 'hitHeavy' : 'hitLight'), 1 + comboBoost * 0.6);
+    // 漫畫鼻血（設定開啟時）：重擊時鼻子噴血
+    if (big && settingsStore.get().nosebleed) p.nosebleed();
     // 連擊達 10 的倍數：木偶在地面上時噴飛（鐵錘本來就會在手風琴後噴飛）
-    if (res.comboMilestone && !p.airborne && id !== 'hammer') p.explode(0.8, prefersReducedMotion());
+    if (res.comboMilestone) audio.play('combo');
+    if (res.comboMilestone && !p.airborne && id !== 'hammer') {
+      p.explode(0.8, prefersReducedMotion());
+      audio.play('clatter');
+    }
   }
 
   private showScore(lines: ScoreLine[], at: Vector3) {
@@ -582,14 +635,17 @@ export class BattleController {
         pl.knockedDown(dir, KNOCKDOWN.push, KNOCKDOWN.getUp, KNOCKDOWN.invulnerable);
         this.hardAi.restAfterHit();
         this.words.add('倒地！', pl.x, 4.6, '#FFFFFF', 0.9);
+        audio.play('hurt', 1.2);
         this.kick(0.8);
       } else {
         pl.knockedBack(dir);
         this.words.add('唉唷！', pl.x, 4.6, '#FFFFFF', 0.8);
+        audio.play('hurt');
         this.kick(0.5);
       }
     } else if (dodged) {
       this.words.add('閃過！', pl.x, 4.8, '#2FB896', 0.8);
+      audio.play('dodge');
       if (hard) {
         this.ledger.bonus(SCORING.dodgeBonus);
         this.words.add(`+${SCORING.dodgeBonus} 閃避成功！`, pl.x, 5.6, '#FFC63A', 0.85, 'score');
@@ -602,11 +658,25 @@ export class BattleController {
     const p = this.puppet;
     if (e.type === 'landHard') {
       this.words.add('嘩啦！', p.x, 1.2, '#FFC63A', 1.1);
+      audio.play('crash');
       this.kick(1);
     } else if (e.type === 'land') {
       this.words.add('咚！', p.x, 0.8, '#FFC63A', 0.8);
+      audio.play('bonk', 0.8);
+    } else if (e.type === 'wall' && this.bounceOn && this.live && this.gameTime - this.lastPadHit > EVENTS.bounce.hitGap) {
+      // 彈墊：用力彈回場中並加分
+      this.lastPadHit = this.gameTime;
+      p.vx = -e.side * e.speed * EVENTS.bounce.restitution;
+      this.pads.hit(e.side);
+      this.ledger.bonus(EVENTS.bounce.bonus);
+      this.padHits++;
+      this.words.add(`+${EVENTS.bounce.bonus} 彈墊！`, p.x, 4.4, '#FFC63A', 0.9, 'score');
+      this.particles.burst(new Vector3(p.x + e.side * 0.8, 3, 0), 'star', 6);
+      audio.play('bonk', 1.4);
+      this.kick(0.5);
     } else if (e.type === 'wall') {
       this.words.add('碰！', p.x, 3, '#FFC63A', 0.8);
+      audio.play('bonk');
       this.particles.burst(new Vector3(p.x, 3, 0), 'star', 4);
     }
   }
@@ -634,6 +704,7 @@ export class BattleController {
   }
 
   private endRound(banner = true) {
+    this.stopEvents();
     this.handleDialogue(this.director.stop());
     this.phase = 'ended';
     this.phaseTime = 0;
@@ -652,10 +723,35 @@ export class BattleController {
   }
 
   // ---------- 致命一擊 ----------
+  /** 小型活動：狂熱時間、鞋子時間、彈墊時間（開始時顯示 2 秒提示） */
+  private updateEvents() {
+    const { active, started } = this.events.update(this.clock.elapsed());
+    for (const e of started) {
+      this.ev.onBanner(EVENT_BANNER[e]);
+      audio.play(e === 'fever' ? 'combo' : 'go');
+      if (e === 'shoe') this.player.cooldowns.shoe = Math.min(this.player.cooldownOf('shoe'), EVENTS.shoe.cooldown);
+    }
+    this.fever = active.has('fever');
+    audio.setFever(this.fever);
+    this.player.cdOverride = active.has('shoe') ? { shoe: EVENTS.shoe.cooldown } : {};
+    this.bounceOn = active.has('bounce');
+    this.pads.show(this.bounceOn);
+  }
+
+  private stopEvents() {
+    this.events.stop();
+    this.fever = this.bounceOn = false;
+    audio.setFever(false);
+    this.player.cdOverride = {};
+    this.pads.hideNow();
+  }
+
   /** 剩 15 秒：停住計時與畫面，問玩家要不要給致命一擊。 */
   private askFinisher() {
     this.askedLen = this.clock.lengthSec;
     this.phase = 'ask';
+    audio.play('ask');
+    audio.setPaused(true);
     this.clock.pause();
     this.input.setEnabled(false);
     this.ai.interrupt();
@@ -669,6 +765,7 @@ export class BattleController {
     if (this.phase !== 'ask') return;
     this.clock.extend(ROUND.extendBy);
     this.phase = 'fight';
+    audio.setPaused(false);
     this.clock.resume();
     this.input.setEnabled(true);
     this.ev.onBanner(`再打 ${ROUND.extendBy / 60} 分鐘！`);
@@ -681,6 +778,10 @@ export class BattleController {
     this.handleDialogue(this.director.stop());
     this.clock.stop();
     this.phase = 'finisher';
+    this.stopEvents();
+    audio.setMusic(null);
+    audio.setPaused(false);
+    audio.play('charge');
     this.showT = 0;
     this.input.setEnabled(false);
     this.shoes.clear();
@@ -744,6 +845,7 @@ export class BattleController {
       pl.thrust = Math.min(1, (t - F.fire) / 0.12);
       if (fin.step < 2) {
         fin.step = 2;
+        audio.play('blast');
         this.words.add('光波————！', pl.x + side * 2, 6.2, '#FFC63A', 1.3);
         this.kick(0.8);
         this.flash = Math.max(this.flash, reduced ? 0.15 : 0.5);
@@ -774,6 +876,7 @@ export class BattleController {
     if (fin.step === 5 && fin.koAt < 0) fin.koAt = t + 0.35;
     if (fin.step >= 4 && fin.step < 6 && ((fin.koAt >= 0 && t >= fin.koAt) || t >= F.koLatest)) {
       fin.step = 6;
+      audio.play('ko');
       fin.koT = t;
       this.ledger.bonus(F.score);
       this.words.add(`+${F.score} 致命一擊`, p.x * 0.3, 6, '#FFC63A', 1.1, 'score');
@@ -869,6 +972,10 @@ export class BattleController {
 
   /** 道歉轉場：停止攻擊與 AI、清掉殘留物，積木人走回中央單膝跪地，燈光轉暖、鏡頭推近。 */
   startApology() {
+    this.stopEvents();
+    audio.setFever(false);
+    audio.setPaused(false);
+    audio.setMusic('calm');
     this.handleDialogue(this.director.stop());
     this.phase = 'apology';
     this.showT = 0;
@@ -903,6 +1010,7 @@ export class BattleController {
 
   /** 結局演出（約 8 秒）。 */
   playEnding(kind: EndingShow) {
+    audio.play(kind === 'forgive' ? 'choir' : 'soft');
     this.clearShow();
     this.phase = 'ending';
     this.endingShow = kind;
@@ -1062,6 +1170,7 @@ export class BattleController {
       cooldowns: cds,
       countdown: cd,
       paused: this.paused,
+      events: this.phase === 'fight' ? this.events.current : [],
       cine: this.phase !== 'finisher' ? '' : this.showT < FINISHER.fire ? 'title' : this.fin.step >= 6 ? 'ko' : '',
     };
     const key = JSON.stringify(h);
@@ -1100,10 +1209,17 @@ export class BattleController {
       showT: this.showT,
       flat: this.puppet.isFlat,
       clockLength: this.clock.lengthSec,
+      events: this.events.current,
+      padHits: this.padHits,
       stunned: this.puppet.isStunned,
       bucket: this.puppet.hasBucket,
       accordion: this.puppet.isAccordion,
     };
+  }
+
+  /** 測試用：指定某一分鐘的鞋子時間、彈墊時間開始秒數 */
+  debugPlanEvents(minute: number, shoe: number | null, bounce: number | null) {
+    this.events.setPlan(minute, { shoe, bounce });
   }
 
   /** 測試用：把玩家放到指定位置 */
@@ -1113,12 +1229,14 @@ export class BattleController {
 
   dispose() {
     this.disposed = true;
+    audio.setMusic(null);
+    audio.setPaused(false);
     document.removeEventListener('visibilitychange', this.onVis);
     this.input.dispose();
     this.clearShow();
     this.bubble.dispose();
     this.shoes.clear();
-    this.ghosts.clear();
+    this.ghosts.dispose();
     this.hitStop = 0;
     this.particles.clear();
     this.words.clear();

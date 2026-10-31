@@ -30,6 +30,8 @@ export class Player {
   /** 困難模式：被擊倒（躺下再起身）與起身後的無敵時間 */
   down = false;
   invuln = 0;
+  /** 小型活動暫時改變的冷卻（例：鞋子時間丟鞋子 0.3 秒） */
+  cdOverride: Partial<Record<MoveId, number>> = {};
   /** 演出時退場（道歉時不出場） */
   hidden = false;
   /** 空中連擊：跳起追打的高度（目前、目標） */
@@ -98,7 +100,7 @@ export class Player {
     }
     if (this.busy || this.cooldownOf(id) > 0) return null;
     this.attack = startAttack(id, seq, this.facing);
-    this.cooldowns[id] = MOVES[id].cooldown;
+    this.cooldowns[id] = this.cdOverride[id] ?? MOVES[id].cooldown;
     return this.attack;
   }
 

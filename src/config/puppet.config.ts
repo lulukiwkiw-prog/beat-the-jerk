@@ -44,6 +44,8 @@ export const PUPPET = {
     chair: { push: 5, squashX: 9, squashY: -9, torso: 8 },
     /** 鐵錘：壓成手風琴（高度比例、橫向比例、起伏）持續秒數，彈回後噴飛 */
     hammer: { y: 0.42, x: 1.3, ripple: 0.09, rippleSpeed: 38, time: 0.5, bounce: 12 },
+    /** 漫畫鼻血貼片停留秒數 */
+    nosebleed: { life: 2.5 },
     /** 撞牆測試：擊退速度 */
     wallSmash: { push: 15, squashY: 6 },
     /** 踩扁：壓成一片（高度比例、橫向比例）持續秒數，之後彈回 */

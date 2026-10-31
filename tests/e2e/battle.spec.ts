@@ -315,3 +315,37 @@ test('困難模式：木偶偶爾閃開攻擊，閃開時攻擊落空', async ({
   }
   expect(evaded).toBe(true);
 });
+
+test('小型活動：鞋子時間冷卻 0.3 秒、彈墊把木偶彈回並 +10、狂熱時間（第 15～40 秒）', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = watchConsole(page);
+  await toBattle(page, 60);
+  const b = bt(page);
+  // 指定這一分鐘：第 1 秒鞋子時間、第 2 秒彈墊時間
+  await page.evaluate(() => (window as unknown as { __bt: { battle: { debugPlanEvents(m: number, s: number, b: number): void } } }).__bt.battle.debugPlanEvents(0, 1, 2));
+  await expect(page.getByTestId('event-shoe')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('鞋子時間！丟鞋子不用等')).toBeVisible();
+  await page.keyboard.press('q');
+  await page.keyboard.press('4');
+  const cd = page.getByTestId('move-shoe').locator('.cdt');
+  await expect(cd).toBeVisible();
+  expect(Number(await cd.textContent())).toBeLessThanOrEqual(0.3);
+
+  // 彈墊：飛踢把木偶踢到場邊，撞上彈墊彈回來 +10
+  await expect(page.getByTestId('event-bounce')).toBeVisible({ timeout: 15_000 });
+  await page.keyboard.press('q');
+  for (let i = 0; i < 6 && (await b.battle()).padHits === 0; i++) {
+    const s = await b.battle();
+    await b.setPlayerX(s.puppetX - 5.5);
+    await page.keyboard.press('4');
+    await page.waitForTimeout(2200);
+  }
+  expect((await b.battle()).padHits).toBeGreaterThan(0);
+  await page.screenshot({ path: 'screenshots/stage-6/desktop-event-bounce.png' });
+
+  // 狂熱時間
+  await expect(page.getByTestId('event-fever')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('battle-stage')).toHaveClass(/fever/);
+  await page.screenshot({ path: 'screenshots/stage-6/desktop-event-fever.png' });
+  expect(errors.filter((e) => !e.includes('GL Driver'))).toEqual([]);
+});

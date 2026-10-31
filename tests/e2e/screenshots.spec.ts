@@ -6,7 +6,7 @@ const SIZES = [
   { name: 'mobile-landscape', width: 844, height: 390 },
   { name: 'desktop', width: 1440, height: 900 },
 ];
-const DIR = 'screenshots/stage-5';
+const DIR = 'screenshots/stage-6';
 
 for (const s of SIZES) {
   test(`截圖 ${s.name}`, async ({ page }) => {
@@ -17,6 +17,10 @@ for (const s of SIZES) {
     await page.getByRole('button', { name: '委屈', exact: true }).click();
     await page.getByTestId('field-d-0').fill('不是你的錯');
     await page.screenshot({ path: `${DIR}/${s.name}-01-wanted.png` });
+    // 設定：音效、音樂、漫畫鼻血、清除資料
+    await page.getByTestId('open-settings').click();
+    await page.screenshot({ path: `${DIR}/${s.name}-01b-settings.png` });
+    await page.getByRole('button', { name: '關閉' }).click();
     await page.getByTestId('go-paint').click();
     await expect(page.getByTestId('paint-stage').locator('canvas')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __bt: { paintRoom: { isSettled: boolean } } }).__bt.paintRoom.isSettled);
@@ -27,6 +31,13 @@ for (const s of SIZES) {
     await drag(page, (await b.point('torso', 4, 0.5, 0.1))!, (await b.point('torso', 4, 0.5, 0.85))!);
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${DIR}/${s.name}-02-paint.png` });
+    // 配件：眼鏡、領帶、帽子
+    for (const [tab, name] of [['眼鏡', '墨鏡'], ['領帶', '紅領帶'], ['帽子', '紳士帽']]) {
+      await page.getByRole('radio', { name: tab, exact: true }).click();
+      await page.getByRole('button', { name: `套用範例：${name}` }).click();
+    }
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${DIR}/${s.name}-02c-accessories.png` });
     await page.getByTestId('go-duel').click();
     await expect(page.getByTestId('begin-battle')).toBeVisible({ timeout: 20_000 });
     const skip = page.getByRole('button', { name: '略過' });

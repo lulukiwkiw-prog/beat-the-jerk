@@ -8,7 +8,7 @@ import { DecalLayer } from './decals';
 import type { PaintStore } from './paintSurface';
 import { PART_DEFS, SKELETON as SK, type FixedPartId, type PaintPartId } from './parts';
 import { Scatter } from './scatter';
-import { buildAccessory, type AccessorySlot } from './looks/accessories';
+import { ACCESSORY_SLOTS, buildAccessory } from './looks/accessories';
 import { buildBucket } from '../projectiles/weaponModels';
 import { DelayBuffer, spring0, stepSpring, type Spring } from './spring';
 
@@ -200,7 +200,7 @@ export class Puppet {
     this.accObjects.forEach((o) => o.removeFromParent());
     this.accObjects = [];
     this.extraPaint = [];
-    for (const slot of ['face', 'hair', 'costume'] as AccessorySlot[]) {
+    for (const slot of ACCESSORY_SLOTS) {
       const id = paint.accessories[slot];
       if (!id) continue;
       for (const a of buildAccessory(id)) {
@@ -522,6 +522,13 @@ export class Puppet {
       m.depthWrite = alpha > 0.5;
     }
     this.root.visible = alpha > 0.01;
+  }
+
+  /** 漫畫鼻血：鼻子下方兩道紅線（貼片，不寫進彩繪） */
+  nosebleed() {
+    const [w, h, d] = PART_DEFS.head.size;
+    const m = this.decals.add(this.meshes.head, 'nosebleed', w * 0.32, h * 0.42, d / 2, R.nosebleed.life, [0, 0]);
+    m.position.y -= h * 0.2;
   }
 
   gloat() {
