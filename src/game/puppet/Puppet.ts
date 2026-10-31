@@ -534,15 +534,30 @@ export class Puppet {
     this.decals.add(this.meshes.head, 'silly', 1.0, 0.92, d / 2, life, [0, 0]);
   }
 
+  /** 下一次噴飛散了就不組回（致命一擊擊倒），直到 releaseScatter()。 */
+  holdOnScatter = false;
+
   /** 噴飛再組回。 */
   explode(strength: number, reduced: boolean) {
     if (this.scatter || !this.world) return;
     this.world.updateMatrixWorld(true);
-    this.scatter = new Scatter(this.flyables, this.world, this.center(), strength, reduced);
+    this.scatter = new Scatter(this.flyables, this.world, this.center(), strength, reduced, Math.random, this.holdOnScatter);
+  }
+
+  /** 散在地上不組回中 */
+  get isScatterHeld() {
+    return !!this.scatter?.held;
+  }
+
+  /** 散在地上的零件開始飛回組好 */
+  releaseScatter() {
+    this.holdOnScatter = false;
+    this.scatter?.release();
   }
 
   /** 立刻把所有零件歸位。 */
   forceReassemble() {
+    this.holdOnScatter = false;
     if (!this.scatter) return;
     this.scatter.reassemble();
     this.scatter = null;

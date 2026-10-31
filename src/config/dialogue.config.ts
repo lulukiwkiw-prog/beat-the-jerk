@@ -32,3 +32,19 @@ export const APOLOGY = {
   /** 「現在」分數達此值時顯示低調支援提示 */
   supportThreshold: 7,
 } as const;
+
+/** 道歉時的舞台：背景轉黑所需時間、聚光燈（顏色、角度、柔邊、高度、往前偏移、亮度、光柱與光圈） */
+export const APOLOGY_SPOT = {
+  blackout: 0.9,
+  /** 黑掉之後保留一點點環境光，看得出積木人的輪廓 */
+  ambient: 0.06,
+  color: '#FFE6BF',
+  angle: 0.3,
+  penumbra: 0.55,
+  height: 12,
+  forward: 3.2,
+  intensity: 7,
+  beamOpacity: 0.11,
+  poolRadius: 2.4,
+  poolOpacity: 0.55,
+} as const;

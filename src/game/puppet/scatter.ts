@@ -32,6 +32,9 @@ export class Scatter {
   private items: Item[];
   private done = false;
 
+  /**
+   * hold＝散了就躺在地上不組回（致命一擊擊倒），之後呼叫 release() 才飛回原位。
+   */
   constructor(
     meshes: Object3D[],
     private readonly world: Object3D,
@@ -39,6 +42,7 @@ export class Scatter {
     strength: number,
     reduced: boolean,
     rand: () => number = Math.random,
+    private hold = false,
   ) {
     const scale = reduced ? C.reducedMotionScale : 1;
     world.updateMatrixWorld(true);
@@ -76,10 +80,23 @@ export class Scatter {
     return this.done;
   }
 
+  get held() {
+    return this.hold;
+  }
+
+  /** 開始飛回原位（returnTime 內組好）。 */
+  release() {
+    if (!this.hold) return;
+    this.hold = false;
+    this.t = C.flyTime;
+  }
+
   /** 推進時間；回傳 true 表示已組回完成。 */
   update(dt: number): boolean {
     if (this.done) return true;
     this.t += dt;
+    // 擊倒：一直停在飛散階段，落地後慢慢停住
+    if (this.hold) this.t = Math.min(this.t, C.flyTime - 0.001);
     if (this.t < C.flyTime) {
       for (const it of this.items) {
         const m = it.mesh;
@@ -96,6 +113,14 @@ export class Scatter {
           it.ang.multiplyScalar(C.spinFriction);
         }
         m.position.z = Math.max(C.zMin, Math.min(C.zMax, m.position.z));
+        if (this.hold && m.position.y <= C.floorY + 0.01) {
+          // 躺在地上：滑動與翻滾逐漸停下
+          const f = Math.pow(0.04, dt);
+          it.vel.x *= f;
+          it.vel.z *= f;
+          it.ang.multiplyScalar(f);
+          if (Math.abs(it.vel.y) < 0.6) it.vel.y = 0;
+        }
       }
       return false;
     }

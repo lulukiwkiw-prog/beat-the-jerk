@@ -44,6 +44,31 @@ describe('積木噴飛再組回', () => {
     });
   });
 
+  it('致命一擊擊倒（hold）：散了就躺在地上不組回，release 後才飛回原位', () => {
+    const { world, body, parts } = rig();
+    const home = parts.map((p) => p.position.clone());
+    const sc = new Scatter(parts, world, new Vector3(2, 2.4, 0), 1, false, seeded(), true);
+    for (let i = 0; i < 60 * 10; i++) expect(sc.update(1 / 60)).toBe(false);
+    expect(parts.every((p) => p.parent === world)).toBe(true);
+    // 都落在地上、停下來了
+    parts.forEach((p) => expect(p.position.y).toBeLessThan(PUPPET.scatter.floorY + 0.05));
+    const before = parts.map((p) => p.position.clone());
+    sc.update(1 / 60);
+    parts.forEach((p, i) => expect(p.position.distanceTo(before[i])).toBeLessThan(0.02));
+    sc.release();
+    let t = 0;
+    let done = false;
+    while (!done && t < 3) {
+      done = sc.update(1 / 60);
+      t += 1 / 60;
+    }
+    expect(done).toBe(true);
+    expect(t).toBeCloseTo(PUPPET.scatter.returnTime, 1);
+    parts.forEach((p, i) => {
+      expect(p.parent).toBe(body);
+      expect(p.position.distanceTo(home[i])).toBeLessThan(1e-9);
+    });
+  });
   it('飛散中零件不會掉到地板以下', () => {
     const { world, parts } = rig();
     const sc = new Scatter(parts, world, new Vector3(2, 2.4, 0), 1, false, seeded());

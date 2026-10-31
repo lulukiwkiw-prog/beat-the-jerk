@@ -1,4 +1,4 @@
-import { Color, Fog, Vector3 } from 'three';
+import { Color, Fog, Vector3, type Object3D } from 'three';
 import { CAMERA, GAME } from '../../config/game.config';
 import { EFFECTS, JUGGLE } from '../../config/effects.config';
 import { AfterImages } from '../effects/afterimage';
@@ -11,6 +11,7 @@ import type { Difficulty } from '../../state/battle';
 import { prefersReducedMotion, settingsStore, vibrate } from '../../state/settings';
 import { ComicWords } from '../effects/comicWords';
 import { EnergyBeam } from '../effects/beam';
+import { StageSpot } from '../effects/spotlight';
 import { Particles } from '../effects/particles';
 import { EasyAI } from '../enemy/easyAI';
 import { BattleInput } from '../engine/input';
@@ -21,7 +22,7 @@ import { buildPlayer, PLAYER_HEAD_RADIUS } from '../player/playerModel';
 
 /** 玩家頭頂高度：軀幹底 1.75＋頸部 1.36＋球頭直徑 */
 const PLAYER_TOP = 1.75 + 1.36 + PLAYER_HEAD_RADIUS * 2;
-import { APOLOGY } from '../../config/dialogue.config';
+import { APOLOGY, APOLOGY_SPOT } from '../../config/dialogue.config';
 import { DialogueBubble } from '../dialogue/bubble';
 import { DialogueDirector, type DialogueEvent } from '../dialogue/director';
 import { ForgiveFx, LeaveFx } from '../ending/endingFx';
@@ -156,11 +157,14 @@ export class BattleController {
   private hitStop = 0;
   private ghosts: AfterImages;
   private ghostT = 0;
+  private arena: Object3D;
+  /** 道歉時的聚光燈 */
+  private spot: StageSpot | null = null;
+  private black = new Color('#000000');
   /** 困難模式成功閃避次數 */
   private dodges = 0;
   private early = false;
   private showT = 0;
-  private warmDuration = 0;
   private endingShow: EndingShow | null = null;
   private forgiveFx: ForgiveFx | null = null;
   private leaveFx: LeaveFx | null = null;
@@ -180,7 +184,8 @@ export class BattleController {
     this.bubble = new DialogueBubble(dom.bubble);
     this.host = new SceneHost(dom.stage, ARENA_BACKGROUND, 11, CAMERA.fov);
     this.host.scene.fog = new Fog(ARENA_BACKGROUND, 30, 60);
-    this.host.scene.add(buildArena());
+    this.arena = buildArena();
+    this.host.scene.add(this.arena);
     this.host.renderer.domElement.style.touchAction = 'none';
     this.puppet = new Puppet(paint);
     this.puppet.addTo(this.host.scene);
@@ -637,7 +642,8 @@ export class BattleController {
     this.shoes.clear();
     this.ghosts.clear();
     this.hitStop = 0;
-    this.puppet.forceReassemble();
+    // 致命一擊擊倒的積木人維持散在地上，道歉時才拼回來
+    if (!this.puppet.isScatterHeld) this.puppet.forceReassemble();
     this.puppet.clearStatus();
     this.puppet.setAiPose('idle', -1);
     this.dom.alert.hidden = true;
@@ -696,6 +702,8 @@ export class BattleController {
     pl.x = -side * FINISHER.standX;
     pl.facing = side;
     p.vx = 0;
+    // 擊倒後散在地上，不再組回
+    p.holdOnScatter = true;
     this.beam?.dispose();
     this.beam = new EnergyBeam(this.host.scene);
     this.fin = { step: 0, shot: -1, side, aura: 0, koAt: -1, koT: -1 };
@@ -848,6 +856,10 @@ export class BattleController {
     this.camOverride = null;
     this.player.script = null;
     this.player.powerUp = this.player.thrust = 0;
+    this.player.hidden = false;
+    this.arena.visible = true;
+    this.spot?.dispose();
+    this.spot = null;
     this.beam?.dispose();
     this.beam = null;
     this.player.rig.root.position.z = 0;
@@ -870,13 +882,16 @@ export class BattleController {
     this.dom.alert.hidden = true;
     this.resetAi();
     const p = this.puppet;
-    p.forceReassemble();
+    if (p.isScatterHeld) {
+      // 致命一擊散在地上的零件先飛回拼好，再走到中央跪下
+      p.releaseScatter();
+      this.showT = -(PUPPET.scatter.returnTime + 0.3);
+    } else p.forceReassemble();
     p.clearStatus();
     p.setPoseMode('stand');
     p.setAiPose('idle', -1);
     p.setStance(false);
     this.walkFrom = { puppet: p.x, player: this.player.x };
-    this.warmDuration = APOLOGY.warmTime + (this.early ? APOLOGY.earlyExtraWarm : 0);
     this.emitHud(true);
   }
 
@@ -915,16 +930,25 @@ export class BattleController {
       const w = smooth(t / APOLOGY.walkTime);
       if (this.phase === 'apology') {
         p.x = this.walkFrom.puppet + (0 - this.walkFrom.puppet) * w;
-        pl.x = this.walkFrom.player + (-4 - this.walkFrom.player) * w;
         if (t >= APOLOGY.walkTime) p.setPoseMode('kneel');
-        this.setWarmth(Math.min(1, t / this.warmDuration));
-        this.host.lights.hemi.intensity *= 1 - 0.2 * Math.min(1, t / this.warmDuration);
       } else {
         p.setFade(Math.max(0, 1 - t / 1.2));
-        this.setWarmth(1);
-        this.host.lights.hemi.intensity *= 0.6;
       }
-      this.camOverride = { x: p.x * 0.4 - 0.6, dist: 13, lookY: 2.3, camY: 3.4, minHalfW: 3.6 };
+      // 背景全黑、擂台與玩家退場，只剩一盞燈從上方照在積木人頭上
+      const S = APOLOGY_SPOT;
+      const dark = this.phase === 'worthy' ? 1 : smooth(Math.max(0, t) / S.blackout);
+      this.setWarmth(0);
+      bg.copy(this.bgCool).lerp(this.black, dark);
+      const L = this.host.lights;
+      const keep = 1 - (1 - S.ambient) * dark;
+      L.hemi.intensity *= keep;
+      L.key.intensity *= 1 - dark;
+      L.fill.intensity *= 1 - dark;
+      this.arena.visible = dark < 1;
+      pl.hidden = dark >= 1;
+      this.spot ??= new StageSpot(this.host.scene);
+      this.spot.update(p.x, p.lift + headCenterY(), smooth((Math.max(0, t) - 0.2) / S.blackout));
+      this.camOverride = { x: p.x, dist: 11.5, lookY: 2.5, camY: 3.4, minHalfW: 3.2 };
     } else if (this.phase === 'ending') {
       const u = Math.min(1, t / APOLOGY.endingTime);
       const show = this.endingShow;

@@ -176,9 +176,11 @@ test('剩 15 秒問致命一擊：暫停計時；「繼續打」延長 1 分鐘�
   await expect(page.getByText('致命一擊', { exact: true })).toBeVisible();
   await expect(page.getByText('K.O.!')).toBeVisible({ timeout: 60_000 });
   await expect.poll(async () => (await b.battle()).score, { timeout: 10_000 }).toBe(before + 100);
+  // 擊倒後散在地上不組回，直到進入道歉
+  expect((await b.battle()).scattered).toBe(true);
   await expect(page.getByTestId('apology')).toBeVisible({ timeout: 60_000 });
+  await expect.poll(async () => (await b.battle()).scattered, { timeout: 10_000 }).toBe(false);
   const r = await b.battle();
-  expect(r.scattered).toBe(false);
   expect(r.projectiles).toBe(0);
   expect(errors).toEqual([]);
 });
@@ -274,12 +276,12 @@ test('困難模式：木偶會走位；被打中會倒地、1 秒內起身並短
   await expect.poll(async () => (await b.battle()).puppetX, { timeout: 20_000 }).toBeLessThan(x0 - 1);
 
   // 站著不動被打中：倒地 → 起身 → 無敵
-  await expect.poll(async () => (await b.battle()).playerDown, { timeout: 40_000 }).toBe(true);
+  let down = await b.battle();
+  await expect.poll(async () => (down = await b.battle()).playerDown, { timeout: 40_000, intervals: [30] }).toBe(true);
+  // 倒地當下：無敵時間＝起身（0.9 秒）＋起身後 1.5 秒，所以一定比 1.5 秒長
+  expect(down.playerInvuln).toBeGreaterThan(1.5);
   await page.screenshot({ path: 'screenshots/stage-5/desktop-hard-knockdown.png' });
-  // 起身那一刻還在無敵中（同一個快照裡檢查）
-  let up = await b.battle();
-  await expect.poll(async () => (up = await b.battle()).playerDown, { timeout: 10_000, intervals: [30] }).toBe(false);
-  expect(up.playerInvuln).toBeGreaterThan(0);
+  await expect.poll(async () => (await b.battle()).playerDown, { timeout: 10_000 }).toBe(false);
   expect((await b.battle()).score).toBe(0);
 
   // 等下一拳的預備動作，按閃避：+20

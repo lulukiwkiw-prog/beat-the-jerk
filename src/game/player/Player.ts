@@ -30,6 +30,8 @@ export class Player {
   /** 困難模式：被擊倒（躺下再起身）與起身後的無敵時間 */
   down = false;
   invuln = 0;
+  /** 演出時退場（道歉時不出場） */
+  hidden = false;
   /** 空中連擊：跳起追打的高度（目前、目標） */
   airLift = 0;
   airTarget = 0;
@@ -422,7 +424,7 @@ export class Player {
       g.scale.set(o ? 0.5 : 1, o ? 1.35 : 1.05, o ? 1.2 : 1.1);
     }
     // 起身後無敵：閃爍
-    L.root.visible = !(this.invuln > 0 && this.stun <= 0 && Math.floor(this.bob * 12) % 2 === 0);
+    L.root.visible = !this.hidden && !(this.invuln > 0 && this.stun <= 0 && Math.floor(this.bob * 12) % 2 === 0);
     // 手上的武器：棍棒、鐵錘整招都拿著；投擲物出手後就不在手上
     const id = a?.move.id;
     const before = !!a && a.t < a.move.windup;
